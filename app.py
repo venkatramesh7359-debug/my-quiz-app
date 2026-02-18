@@ -6,7 +6,7 @@ st.title("📚 Venkat's Learning App")
 
 # మీ గూగుల్ షీట్ URL ఇక్కడ ఇవ్వండి
 # Share -> Anyone with the link -> Viewer అని మార్చడం మర్చిపోకండి!
-SHEET_URL = "మీ_గూగుల్_షీట్_URL_ఇక్కడ_పేస్ట్_చేయండి"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/edit?pli=1&gid=0#gid=0"
 
 def load_data(url):
     try:
