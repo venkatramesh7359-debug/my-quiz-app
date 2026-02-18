@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="Venkat's App", page_icon="📚")
+st.set_page_config(page_title="https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/edit?pli=1&gid=0#gid=0", page_icon="📚")
 st.title("📚 Venkat's Learning App")
 st.write("హలో! ఇది మీ మొదటి వెబ్ యాప్.")
 
