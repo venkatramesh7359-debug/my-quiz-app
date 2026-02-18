@@ -1,7 +1,2 @@
 streamlit
-
-gspread
-
-pandas
-
-google-auth
+st-gsheets-connection
