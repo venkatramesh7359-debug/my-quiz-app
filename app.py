@@ -5,7 +5,7 @@ st.set_page_config(page_title="Venkat Quiz App", page_icon="📚")
 st.title("📚 Venkat's Learning App")
 
 # మీ షీట్ లింక్
-SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
+SHEET_URL = https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv
 
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
