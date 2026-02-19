@@ -24,7 +24,7 @@ components.html(
 # 3. Google Sheets URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
 
-# 4. Session State initialization
+# 4. Session State
 if 'unlocked_level' not in st.session_state: st.session_state.unlocked_level = 1
 if 'current_playing_level' not in st.session_state: st.session_state.current_playing_level = None
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
@@ -44,12 +44,12 @@ st.title("🎮 Venkat's Learning Quest")
 @st.cache_data(ttl=0)
 def load_data(url):
     try:
+        # డేటాను చదివి, కాలమ్ పేర్లను క్లీన్ చేయడం
         data = pd.read_csv(url)
-        # ఇక్కడ అసలు మ్యాజిక్ ఉంది: కాలమ్ పేర్లలో ఉండే స్పేస్ లు, క్యాపిటల్ లెటర్స్ క్లీన్ చేస్తుంది
-        data.columns = [c.strip().lower().replace(' ', '_') for c in data.columns]
+        data.columns = [str(c).strip().lower().replace(' ', '_') for c in data.columns]
         return data
     except Exception as e:
-        st.error(f"Error loading CSV: {e}")
+        st.error(f"Error: {e}")
         return None
 
 try:
@@ -76,23 +76,21 @@ try:
             for l in range(1, total_lessons + 1):
                 start_row = (l - 1) * rows_per_lesson
                 
-                # లెసన్ పేరుని పక్కాగా తీయడం
-                current_name = f"Lesson {l}"
+                # --- లెసన్ పేరును పక్కాగా కనిపెట్టే లాజిక్ ---
+                display_name = f"Lesson {l}"
                 if start_row < len(df):
-                    # నీ షీట్ లో 'lesson_name' కాలమ్ ఉందో లేదో సరిగ్గా వెతుకుతుంది
-                    col_names = df.columns.tolist()
-                    found_col = [c for c in col_names if 'lesson' in c and 'name' in c]
-                    
-                    if found_col:
-                        val = df.iloc[start_row][found_col[0]]
+                    # కాలమ్ పేర్లలో 'lesson' అని ఎక్కడ ఉన్నా అది తీసుకుంటుంది
+                    lesson_cols = [c for c in df.columns if 'lesson' in c]
+                    if lesson_cols:
+                        val = df.iloc[start_row][lesson_cols[0]]
                         if pd.notna(val) and str(val).strip() != "":
-                            current_name = str(val)
+                            display_name = str(val)
                         else:
-                            # ఒకవేళ ఆ రో లో పేరు లేకపోతే, దాని పైన ఎక్కడైనా ఉందేమో వెతుకుతుంది
-                            val = df.iloc[:start_row+1][found_col[0]].dropna().iloc[-1]
-                            current_name = str(val)
+                            # ఒకవేళ ఆ వరుస ఖాళీగా ఉంటే, పై వరుసల నుండి పేరు వెతుకుతుంది
+                            temp_val = df.iloc[:start_row+1][lesson_cols[0]].dropna().iloc[-1]
+                            display_name = str(temp_val)
 
-                st.markdown(f"### 📘 {current_name}") 
+                st.markdown(f"### 📘 {display_name}") 
                 
                 cols = st.columns(tasks_per_lesson)
                 for t in range(1, tasks_per_lesson + 1):
@@ -123,16 +121,16 @@ try:
             answered_count = 0
 
             for i, row in level_df.iterrows():
-                # కాలమ్స్ వెతకడం
-                q_text = row['question'] if 'question' in df.columns else "Question column missing"
+                # కాలమ్ పేర్లు వెతకడం
+                q_col = [c for c in df.columns if 'question' in c][0]
+                st.markdown(f"**ప్రశ్న {i+1}:** {row[q_col]}")
                 
-                st.markdown(f"**ప్రశ్న {i+1}:** {q_text}")
-                
+                # ఆప్షన్స్
                 opts = [
-                    str(row['option_a']) if 'option_a' in df.columns else "N/A",
-                    str(row['option_b']) if 'option_b' in df.columns else "N/A",
-                    str(row['option_c']) if 'option_c' in df.columns else "N/A",
-                    str(row['option_d']) if 'option_d' in df.columns else "N/A"
+                    str(row[[c for c in df.columns if 'option_a' in c][0]]),
+                    str(row[[c for c in df.columns if 'option_b' in c][0]]),
+                    str(row[[c for c in df.columns if 'option_c' in c][0]]),
+                    str(row[[c for c in df.columns if 'option_d' in c][0]])
                 ]
                 
                 key = f"q_{i}_lvl_{level}"
@@ -151,12 +149,13 @@ try:
 
                 if st.session_state[key]:
                     answered_count += 1
-                    correct_val = str(row['correct_answer']).strip() if 'correct_answer' in df.columns else ""
-                    if str(st.session_state[key]).strip().lower() == correct_val.lower():
+                    ans_col = [c for c in df.columns if 'correct' in c][0]
+                    correct_val = str(row[ans_col]).strip().lower()
+                    if str(st.session_state[key]).strip().lower() == correct_val:
                         st.success("Correct! ✅")
                         score += 1
                     else:
-                        st.error(f"Wrong! ❌ Correct: {correct_val}")
+                        st.error(f"Wrong! ❌ Correct: {row[ans_col]}")
                         st.session_state.level_failed = True
                 st.write("---")
 
@@ -178,4 +177,4 @@ try:
                     st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
 
 except Exception as e:
-    st.error(f"System Error: {e}")
+    st.error(f"Error: {e}. గూగుల్ షీట్‌లో కాలమ్ పేర్లు సరిగ్గా ఉన్నాయో లేదో చెక్ చేయండి.")
