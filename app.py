@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Learning Quest", page_icon="🎮", layout="centered")
 
-# 2. Footer & Fullscreen Hiding (JavaScript)
+# 2. JavaScript to hide Footer & Fullscreen
 components.html(
     """
     <script>
@@ -40,7 +40,16 @@ st.title("🎮 Venkat's Learning Quest")
 try:
     df = pd.read_csv(SHEET_URL)
     
-    # Step 1: Login
+    # --- లెసన్ పేర్ల లిస్ట్ (నువ్వు ఇక్కడ పేర్లు మార్చుకోవచ్చు) ---
+    # నీ దగ్గర ఎన్ని లెసన్స్ ఉంటే అన్ని పేర్లు ఇక్కడ ఇవ్వు
+    lesson_names = {
+        1: "తెలుగు వ్యాకరణం",
+        2: "English Grammar",
+        3: "Social Studies",
+        4: "Mathematics",
+        5: "General Science"
+    }
+
     if st.session_state.user_name == "":
         name = st.text_input("మీ పేరు నమోదు చేయండి:")
         if st.button("Start Game 🚀"):
@@ -48,19 +57,19 @@ try:
                 st.session_state.user_name = name
                 st.rerun()
     
-    # Step 2: Lesson & Tasks (Levels) View
     elif st.session_state.current_playing_level is None:
         st.subheader(f"Player: {st.session_state.user_name}")
         
-        # ఉదాహరణకి ఒక్కో లెసన్ లో 5 టాస్క్ లు (Levels)
         tasks_per_lesson = 5
         total_levels = (len(df) // 10) + (1 if len(df) % 10 > 0 else 0)
         total_lessons = (total_levels // tasks_per_lesson) + (1 if total_levels % tasks_per_lesson > 0 else 0)
 
         for l in range(1, total_lessons + 1):
-            st.markdown(f"### 📘 Lesson {l}") # Lesson Heading
-            cols = st.columns(tasks_per_lesson)
+            # ఇక్కడ లెసన్ పేరు కనిపిస్తుంది
+            name_of_lesson = lesson_names.get(l, "మరిన్ని పాఠాలు")
+            st.markdown(f"### 📘 Lesson {l}: {name_of_lesson}") 
             
+            cols = st.columns(tasks_per_lesson)
             for t in range(1, tasks_per_lesson + 1):
                 level_num = ((l - 1) * tasks_per_lesson) + t
                 if level_num > total_levels: break
@@ -76,8 +85,8 @@ try:
         
         st.write("⏳ Uploading more lessons soon...")
 
-    # Step 3: Quiz Screen
     else:
+        # క్విజ్ కోడ్ (మునుపటి లాగే ఉంటుంది)
         level = st.session_state.current_playing_level
         st.header(f"Task {level} ⚡")
         
@@ -92,16 +101,14 @@ try:
             st.markdown(f"**ప్రశ్న {i+1}:** {row['Question']}")
             opts = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
             
-            # ఒకసారి ఆన్సర్ ఇస్తే మార్చకుండా ఉండటానికి 'disabled' వాడుతున్నాం
             key = f"q_{i}_lvl_{level}"
-            if key not in st.session_state:
-                st.session_state[key] = None
+            if key not in st.session_state: st.session_state[key] = None
 
             choice = st.radio(
                 "సమాధానం ఎంచుకోండి:", opts, 
                 index=None if st.session_state[key] is None else opts.index(st.session_state[key]),
                 key=f"radio_{i}",
-                disabled=st.session_state[key] is not None # ఆన్సర్ ఇచ్చాక Lock అయిపోతుంది
+                disabled=st.session_state[key] is not None
             )
 
             if choice and st.session_state[key] is None:
@@ -114,7 +121,7 @@ try:
                     score += 1
                 else:
                     st.error(f"Wrong! ❌ Correct: {row['Correct_Answer']}")
-                    st.session_state.level_failed = True # ఒకటి తప్పు అయినా ఫెయిల్ కింద లెక్క
+                    st.session_state.level_failed = True
             else:
                 all_answered = False
             st.write("---")
@@ -127,13 +134,12 @@ try:
                     st.session_state.unlocked_level += 1
                 st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
             else:
-                st.error(f"ఈ టాస్క్ లో తప్పులు ఉన్నాయి. పాస్ అవ్వడానికి 10/10 రావాలి!")
+                st.error("తప్పులు దొర్లాయి! 10/10 వస్తేనే నెక్స్ట్ లెవల్ ఓపెన్ అవుతుంది.")
                 if st.button("Restart Task 🔄"):
-                    # ఆ లెవల్ కి సంబంధించిన ఆన్సర్స్ అన్నీ క్లియర్ చేయడం
                     for k in list(st.session_state.keys()):
                         if f"_lvl_{level}" in k: del st.session_state[k]
                     st.session_state.level_failed = False
                     st.rerun()
 
 except Exception as e:
-    st.error("Sheet Error!")
+    st.error("డేటా లోడ్ అవ్వలేదు!")
