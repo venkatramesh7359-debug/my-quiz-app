@@ -1,66 +1,76 @@
 import streamlit as st
-import streamlit as st
-
-# ఈ 8 లైన్ల కోడ్‌ని నీ ఫైల్ పైన యాడ్ చేయి
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
-# --- ఇక్కడ నుంచి నీ పాత క్విజ్ కోడ్ ఉంటుంది ---
-st.title("Welcome to My Quiz!")
-# ... నీ మిగతా కోడ్ ...
 import pandas as pd
 
-st.set_page_config(page_title="Venkat Quiz App", page_icon="📚")
-st.title("📚 Venkat's Learning App")
+# 1. పేజీ సెట్టింగ్స్ - ఇది అందరికంటే పైన ఉండాలి
+st.set_page_config(page_title="Venkat Quiz App", page_icon="📚", layout="centered")
 
+# 2. Footer, Toolbar మరియు Streamlit లింక్స్ అన్నీ దాచేసే పక్కా CSS కోడ్
+hide_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    [data-testid="stFooter"] {display: none;}
+    [data-testid="stHeader"] {display: none;}
+    .stApp [data-testid="stToolbar"] {display: none;}
+    </style>
+    """
+st.markdown(hide_style, unsafe_allow_html=True)
+
+# 3. Google Sheets URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
 
+# 4. యాప్ టైటిల్
+st.title("📚 Venkat's Learning App")
+st.write("---")
+
+# 5. క్విజ్ లాజిక్
 if 'quiz_started' not in st.session_state:
     st.session_state.quiz_started = False
 
 try:
+    # డేటాని లోడ్ చేయడం
     df = pd.read_csv(SHEET_URL)
     
     if not st.session_state.quiz_started:
-        name = st.text_input("మీ పేరు నమోదు చేయండి:")
-        if st.button("Start Quiz"):
-            if name:
+        # స్టార్టింగ్ స్క్రీన్
+        name = st.text_input("మీ పేరు నమోదు చేయండి:", placeholder="ఇక్కడ టైప్ చేయండి...")
+        if st.button("Start Quiz 🚀"):
+            if name.strip():
                 st.session_state.user_name = name
                 st.session_state.quiz_started = True
                 st.rerun()
             else:
-                st.warning("దయచేసి పేరు టైప్ చేయండి.")
+                st.warning("దయచేసి మీ పేరును నమోదు చేయండి.")
     else:
-        st.success(f"హలో {st.session_state.user_name}! ఆల్ ది బెస్ట్.")
-        if st.button("Reset Quiz (మళ్ళీ మొదటికి)"):
+        # క్విజ్ స్క్రీన్
+        st.subheader(f"ఆల్ ది బెస్ట్, {st.session_state.user_name}! 👍")
+        
+        if st.button("🔄 Reset Quiz (మొదటి నుండి ప్రారంభించు)"):
             st.session_state.quiz_started = False
             st.rerun()
             
         st.write("---")
         
+        # ప్రశ్నలను చూపించడం
         for index, row in df.iterrows():
-            st.subheader(f"ప్రశ్న {index+1}:")
-            st.write(f"**{row['Question']}**")
+            st.markdown(f"### ప్రశ్న {index+1}:")
+            st.markdown(f"**{row['Question']}**")
             
+            # ఆప్షన్స్
             options = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
             
-            # index=None పెట్టడం వల్ల ఏ ఆప్షన్ ముందే క్లిక్ అయి ఉండదు
             choice = st.radio(
-                f"సరైన సమాధానాన్ని ఎంచుకోండి:", 
+                "సరైన సమాధానాన్ని ఎంచుకోండి:", 
                 options, 
                 index=None, 
-                key=f"radio_{index}"
+                key=f"q_{index}"
             )
             
-            if st.button(f"Check Answer {index+1}", key=f"btn_{index}"):
+            # చెక్ బటన్
+            if st.button(f"Check Answer {index+1} ✔️", key=f"btn_{index}"):
                 if choice is None:
-                    st.warning("ముందుగా ఒక ఆప్షన్‌ను ఎంచుకోండి!")
+                    st.warning("దయచేసి ఒక ఆప్షన్‌ను ఎంచుకోండి!")
                 elif str(choice).strip() == str(row['Correct_Answer']).strip():
                     st.success("సరైన సమాధానం! ✅")
                 else:
@@ -68,5 +78,5 @@ try:
             st.write("---")
 
 except Exception as e:
-    st.error("డేటా లోడ్ అవ్వలేదు.")
-    st.write(f"Error: {e}")
+    st.error("క్షమించండి! డేటా లోడ్ చేయడంలో సమస్య వచ్చింది.")
+    # st.write(f"Error details: {e}") # డెవలప్‌మెంట్ కోసం ఇది వాడుకోవచ్చు
