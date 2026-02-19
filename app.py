@@ -1,4 +1,19 @@
 import streamlit as st
+import streamlit as st
+
+# ఈ 8 లైన్ల కోడ్‌ని నీ ఫైల్ పైన యాడ్ చేయి
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
+# --- ఇక్కడ నుంచి నీ పాత క్విజ్ కోడ్ ఉంటుంది ---
+st.title("Welcome to My Quiz!")
+# ... నీ మిగతా కోడ్ ...
 import pandas as pd
 
 st.set_page_config(page_title="Venkat Quiz App", page_icon="📚")
