@@ -31,7 +31,6 @@ if 'user_name' not in st.session_state: st.session_state.user_name = ""
 if 'level_failed' not in st.session_state: st.session_state.level_failed = False
 
 def reset_to_map():
-    # లెవల్ కి సంబంధించిన డేటా మొత్తం క్లియర్ చేయడం
     level = st.session_state.current_playing_level
     for k in list(st.session_state.keys()):
         if f"_lvl_{level}" in k:
@@ -42,8 +41,15 @@ def reset_to_map():
 
 st.title("🎮 Venkat's Learning Quest")
 
+# Cache clear check - ఎప్పటికప్పుడు కొత్త డేటా కోసం
+@st.cache_data(ttl=0)
+def load_data(url):
+    return pd.read_csv(url)
+
 try:
-    df = pd.read_csv(SHEET_URL)
+    df = load_data(SHEET_URL)
+    # కాలమ్ పేర్లలో ఖాళీలు ఉంటే తీసేయడం
+    df.columns = df.columns.str.strip()
     
     if st.session_state.user_name == "":
         name = st.text_input("మీ పేరు నమోదు చేయండి:")
@@ -56,18 +62,25 @@ try:
         st.subheader(f"Player: {st.session_state.user_name}")
         
         tasks_per_lesson = 5
-        total_levels = (len(df) // 10) + (1 if len(df) % 10 > 0 else 0)
+        rows_per_task = 10
+        rows_per_lesson = tasks_per_lesson * rows_per_task
+        
+        total_levels = (len(df) // rows_per_task) + (1 if len(df) % rows_per_task > 0 else 0)
         total_lessons = (total_levels // tasks_per_lesson) + (1 if total_levels % tasks_per_lesson > 0 else 0)
 
         for l in range(1, total_lessons + 1):
-            # షీట్ లోని 'lesson_name' కాలమ్ నుండి పేరు తీసుకోవడం
-            start_row_for_lesson = (l - 1) * tasks_per_lesson * 10
-            if start_row_for_lesson < len(df):
-                actual_lesson_name = df.iloc[start_row_for_lesson]['lesson_name']
+            # షీట్ లో ప్రతి లెసన్ కి మొదటి రో (Row) నుండి పేరు తీసుకోవడం
+            start_row = (l - 1) * rows_per_lesson
+            if start_row < len(df):
+                # ఇక్కడ 'lesson_name' అనేది నీ షీట్ లో ఉన్న కాలమ్ పేరుకు సరిపోవాలి
+                try:
+                    actual_lesson_name = df.iloc[start_row]['lesson_name']
+                except:
+                    actual_lesson_name = f"Lesson {l}"
             else:
-                actual_lesson_name = "Upcoming Lesson"
+                actual_lesson_name = "Coming Soon..."
                 
-            st.markdown(f"### 📘 Lesson {l}: {actual_lesson_name}") 
+            st.markdown(f"### 📘 {actual_lesson_name}") 
             
             cols = st.columns(tasks_per_lesson)
             for t in range(1, tasks_per_lesson + 1):
@@ -83,9 +96,10 @@ try:
                         st.button(f"Task {t}\n🔒", key=f"lvl_{level_num}", disabled=True)
             st.write("---")
         
-        st.write("⏳ New tasks uploading daily...")
+        st.write("⏳ New content uploading daily...")
 
     else:
+        # Quiz Section (No changes here)
         level = st.session_state.current_playing_level
         st.header(f"Task {level} ⚡")
         
@@ -124,20 +138,17 @@ try:
                     st.session_state.level_failed = True
             st.write("---")
 
-        # టాస్క్ చివరలో రిజల్ట్ చూపించడం
         if answered_count == len(level_df):
-            st.subheader(f"📊 Your Score: {score}/{len(level_df)}")
-            
+            st.subheader(f"📊 Result: {score}/{len(level_df)}")
             if not st.session_state.level_failed and score == len(level_df):
                 st.balloons()
-                st.success("Excellent! 10/10 సాధించారు. తర్వాతి టాస్క్ అన్‌లాక్ అయింది! 🎉")
+                st.success("10/10! Next Task Unlocked! 🎉")
                 if level == st.session_state.unlocked_level:
                     st.session_state.unlocked_level += 1
                 st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
             else:
-                st.error("పాస్ అవ్వడానికి 10/10 రావాలి. దయచేసి మళ్ళీ ప్రయత్నించండి.")
+                st.error("Try Again for 10/10!")
                 if st.button("Retry Task 🔄"):
-                    # Retry నొక్కినప్పుడు ఆన్సర్స్ క్లియర్ అయి మళ్ళీ అదే లెవల్ లో మొదటి ప్రశ్న వస్తుంది
                     for k in list(st.session_state.keys()):
                         if f"_lvl_{level}" in k: del st.session_state[k]
                     st.session_state.level_failed = False
@@ -145,4 +156,4 @@ try:
                 st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
 
 except Exception as e:
-    st.error("షీట్ లో 'lesson_name' కాలమ్ ఉందో లేదో ఒకసారి చెక్ చేయండి!")
+    st.error(f"Error: {e}")
