@@ -45,7 +45,7 @@ st.title("🎮 Venkat's Learning Quest")
 def load_data(url):
     try:
         data = pd.read_csv(url)
-        # కాలమ్ పేర్లలో ఉండే ఖాళీలను తీసేసి, అన్నీ చిన్న అక్షరాల్లోకి మార్చుకుందాం
+        # ఇక్కడ అసలు మ్యాజిక్ ఉంది: కాలమ్ పేర్లలో ఉండే స్పేస్ లు, క్యాపిటల్ లెటర్స్ క్లీన్ చేస్తుంది
         data.columns = [c.strip().lower().replace(' ', '_') for c in data.columns]
         return data
     except Exception as e:
@@ -76,15 +76,21 @@ try:
             for l in range(1, total_lessons + 1):
                 start_row = (l - 1) * rows_per_lesson
                 
-                # 'lesson_name' లేదా 'lessonname' అనే కాలమ్ ఉందో లేదో వెతికి పేరు తీయడం
-                current_name = f"Lesson {l}" # Default name
+                # లెసన్ పేరుని పక్కాగా తీయడం
+                current_name = f"Lesson {l}"
                 if start_row < len(df):
-                    if 'lesson_name' in df.columns:
-                        val = df.iloc[start_row]['lesson_name']
-                        if pd.notna(val): current_name = str(val)
-                    elif 'lessonname' in df.columns:
-                        val = df.iloc[start_row]['lessonname']
-                        if pd.notna(val): current_name = str(val)
+                    # నీ షీట్ లో 'lesson_name' కాలమ్ ఉందో లేదో సరిగ్గా వెతుకుతుంది
+                    col_names = df.columns.tolist()
+                    found_col = [c for c in col_names if 'lesson' in c and 'name' in c]
+                    
+                    if found_col:
+                        val = df.iloc[start_row][found_col[0]]
+                        if pd.notna(val) and str(val).strip() != "":
+                            current_name = str(val)
+                        else:
+                            # ఒకవేళ ఆ రో లో పేరు లేకపోతే, దాని పైన ఎక్కడైనా ఉందేమో వెతుకుతుంది
+                            val = df.iloc[:start_row+1][found_col[0]].dropna().iloc[-1]
+                            current_name = str(val)
 
                 st.markdown(f"### 📘 {current_name}") 
                 
@@ -117,15 +123,17 @@ try:
             answered_count = 0
 
             for i, row in level_df.iterrows():
-                st.markdown(f"**ప్రశ్న {i+1}:** {row['question'] if 'question' in df.columns else 'Question Column Missing'}")
+                # కాలమ్స్ వెతకడం
+                q_text = row['question'] if 'question' in df.columns else "Question column missing"
                 
-                # ఆప్షన్స్ కాలమ్స్ ని కూడా వెతుకుదాం
-                opt_a = row['option_a'] if 'option_a' in df.columns else 'N/A'
-                opt_b = row['option_b'] if 'option_b' in df.columns else 'N/A'
-                opt_c = row['option_c'] if 'option_c' in df.columns else 'N/A'
-                opt_d = row['option_d'] if 'option_d' in df.columns else 'N/A'
+                st.markdown(f"**ప్రశ్న {i+1}:** {q_text}")
                 
-                opts = [str(opt_a), str(opt_b), str(opt_c), str(opt_d)]
+                opts = [
+                    str(row['option_a']) if 'option_a' in df.columns else "N/A",
+                    str(row['option_b']) if 'option_b' in df.columns else "N/A",
+                    str(row['option_c']) if 'option_c' in df.columns else "N/A",
+                    str(row['option_d']) if 'option_d' in df.columns else "N/A"
+                ]
                 
                 key = f"q_{i}_lvl_{level}"
                 if key not in st.session_state: st.session_state[key] = None
@@ -143,8 +151,8 @@ try:
 
                 if st.session_state[key]:
                     answered_count += 1
-                    correct_val = str(row['correct_answer']).strip() if 'correct_answer' in df.columns else 'N/A'
-                    if str(st.session_state[key]).strip() == correct_val:
+                    correct_val = str(row['correct_answer']).strip() if 'correct_answer' in df.columns else ""
+                    if str(st.session_state[key]).strip().lower() == correct_val.lower():
                         st.success("Correct! ✅")
                         score += 1
                     else:
