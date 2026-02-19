@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit.components.v1 as components
 
 # 1. Page Config
-st.set_page_config(page_title="Venkat's Learning Quest", page_icon="🎮", layout="centered")
+st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
 # 2. JavaScript to hide Footer & Fullscreen
 components.html(
@@ -24,13 +24,18 @@ components.html(
 # 3. Google Sheets URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
 
-# 4. Session State
+# 4. Session State initialization
 if 'unlocked_level' not in st.session_state: st.session_state.unlocked_level = 1
 if 'current_playing_level' not in st.session_state: st.session_state.current_playing_level = None
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
 if 'level_failed' not in st.session_state: st.session_state.level_failed = False
 
 def reset_to_map():
+    # లెవల్ కి సంబంధించిన డేటా మొత్తం క్లియర్ చేయడం
+    level = st.session_state.current_playing_level
+    for k in list(st.session_state.keys()):
+        if f"_lvl_{level}" in k:
+            del st.session_state[k]
     st.session_state.current_playing_level = None
     st.session_state.level_failed = False
     st.rerun()
@@ -40,16 +45,6 @@ st.title("🎮 Venkat's Learning Quest")
 try:
     df = pd.read_csv(SHEET_URL)
     
-    # --- లెసన్ పేర్ల లిస్ట్ (నువ్వు ఇక్కడ పేర్లు మార్చుకోవచ్చు) ---
-    # నీ దగ్గర ఎన్ని లెసన్స్ ఉంటే అన్ని పేర్లు ఇక్కడ ఇవ్వు
-    lesson_names = {
-        1: "తెలుగు వ్యాకరణం",
-        2: "English Grammar",
-        3: "Social Studies",
-        4: "Mathematics",
-        5: "General Science"
-    }
-
     if st.session_state.user_name == "":
         name = st.text_input("మీ పేరు నమోదు చేయండి:")
         if st.button("Start Game 🚀"):
@@ -65,9 +60,14 @@ try:
         total_lessons = (total_levels // tasks_per_lesson) + (1 if total_levels % tasks_per_lesson > 0 else 0)
 
         for l in range(1, total_lessons + 1):
-            # ఇక్కడ లెసన్ పేరు కనిపిస్తుంది
-            name_of_lesson = lesson_names.get(l, "మరిన్ని పాఠాలు")
-            st.markdown(f"### 📘 Lesson {l}: {name_of_lesson}") 
+            # షీట్ లోని 'lesson_name' కాలమ్ నుండి పేరు తీసుకోవడం
+            start_row_for_lesson = (l - 1) * tasks_per_lesson * 10
+            if start_row_for_lesson < len(df):
+                actual_lesson_name = df.iloc[start_row_for_lesson]['lesson_name']
+            else:
+                actual_lesson_name = "Upcoming Lesson"
+                
+            st.markdown(f"### 📘 Lesson {l}: {actual_lesson_name}") 
             
             cols = st.columns(tasks_per_lesson)
             for t in range(1, tasks_per_lesson + 1):
@@ -83,10 +83,9 @@ try:
                         st.button(f"Task {t}\n🔒", key=f"lvl_{level_num}", disabled=True)
             st.write("---")
         
-        st.write("⏳ Uploading more lessons soon...")
+        st.write("⏳ New tasks uploading daily...")
 
     else:
-        # క్విజ్ కోడ్ (మునుపటి లాగే ఉంటుంది)
         level = st.session_state.current_playing_level
         st.header(f"Task {level} ⚡")
         
@@ -95,7 +94,7 @@ try:
         level_df = df.iloc[start_idx:end_idx]
         
         score = 0
-        all_answered = True
+        answered_count = 0
 
         for i, row in level_df.iterrows():
             st.markdown(f"**ప్రశ్న {i+1}:** {row['Question']}")
@@ -116,30 +115,34 @@ try:
                 st.rerun()
 
             if st.session_state[key]:
+                answered_count += 1
                 if str(st.session_state[key]).strip() == str(row['Correct_Answer']).strip():
                     st.success("Correct! ✅")
                     score += 1
                 else:
                     st.error(f"Wrong! ❌ Correct: {row['Correct_Answer']}")
                     st.session_state.level_failed = True
-            else:
-                all_answered = False
             st.write("---")
 
-        if all_answered:
-            if st.session_state.level_failed == False and score == len(level_df):
+        # టాస్క్ చివరలో రిజల్ట్ చూపించడం
+        if answered_count == len(level_df):
+            st.subheader(f"📊 Your Score: {score}/{len(level_df)}")
+            
+            if not st.session_state.level_failed and score == len(level_df):
                 st.balloons()
-                st.success("అద్భుతం! టాస్క్ పూర్తి చేసారు! 🔓")
+                st.success("Excellent! 10/10 సాధించారు. తర్వాతి టాస్క్ అన్‌లాక్ అయింది! 🎉")
                 if level == st.session_state.unlocked_level:
                     st.session_state.unlocked_level += 1
                 st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
             else:
-                st.error("తప్పులు దొర్లాయి! 10/10 వస్తేనే నెక్స్ట్ లెవల్ ఓపెన్ అవుతుంది.")
-                if st.button("Restart Task 🔄"):
+                st.error("పాస్ అవ్వడానికి 10/10 రావాలి. దయచేసి మళ్ళీ ప్రయత్నించండి.")
+                if st.button("Retry Task 🔄"):
+                    # Retry నొక్కినప్పుడు ఆన్సర్స్ క్లియర్ అయి మళ్ళీ అదే లెవల్ లో మొదటి ప్రశ్న వస్తుంది
                     for k in list(st.session_state.keys()):
                         if f"_lvl_{level}" in k: del st.session_state[k]
                     st.session_state.level_failed = False
                     st.rerun()
+                st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
 
 except Exception as e:
-    st.error("డేటా లోడ్ అవ్వలేదు!")
+    st.error("షీట్ లో 'lesson_name' కాలమ్ ఉందో లేదో ఒకసారి చెక్ చేయండి!")
