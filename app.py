@@ -5,7 +5,7 @@ import streamlit.components.v1 as components
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Learning Quest", page_icon="🎮", layout="centered")
 
-# 2. JavaScript to hide Footer & Fullscreen
+# 2. Footer & Fullscreen Hiding (JavaScript)
 components.html(
     """
     <script>
@@ -24,97 +24,116 @@ components.html(
 # 3. Google Sheets URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
 
-# 4. Session State Management
+# 4. Session State
 if 'unlocked_level' not in st.session_state: st.session_state.unlocked_level = 1
 if 'current_playing_level' not in st.session_state: st.session_state.current_playing_level = None
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
+if 'level_failed' not in st.session_state: st.session_state.level_failed = False
 
 def reset_to_map():
     st.session_state.current_playing_level = None
+    st.session_state.level_failed = False
     st.rerun()
 
-# 5. UI Setup
 st.title("🎮 Venkat's Learning Quest")
 
 try:
     df = pd.read_csv(SHEET_URL)
-    total_q = len(df)
-    total_levels = (total_q // 10) + (1 if total_q % 10 > 0 else 0)
-
+    
     # Step 1: Login
     if st.session_state.user_name == "":
-        st.subheader("Welcome! Please Login")
-        name = st.text_input("మీ పేరు నమోదు చేయండి:", placeholder="Ex: Venkat")
+        name = st.text_input("మీ పేరు నమోదు చేయండి:")
         if st.button("Start Game 🚀"):
             if name.strip():
                 st.session_state.user_name = name
                 st.rerun()
-            else:
-                st.warning("దయచేసి పేరు నమోదు చేయండి.")
     
-    # Step 2: Level Selection (Candy Crush Map with Scroll Effect)
+    # Step 2: Lesson & Tasks (Levels) View
     elif st.session_state.current_playing_level is None:
-        st.write(f"Player: **{st.session_state.user_name}** | Unlocked: **Level {st.session_state.unlocked_level}**")
-        st.subheader("📍 Select a Level to Play")
+        st.subheader(f"Player: {st.session_state.user_name}")
         
-        # లెవల్స్ ప్రదర్శన
-        for i in range(1, total_levels + 1):
-            cols = st.columns([1, 4])
-            with cols[0]:
-                if i <= st.session_state.unlocked_level:
-                    st.write(f"⭐ **L{i}**")
-                else:
-                    st.write(f"🔒 **L{i}**")
-            with cols[1]:
-                if i <= st.session_state.unlocked_level:
-                    if st.button(f"Level {i} ఆడండి", key=f"btn_{i}", use_container_width=True):
-                        st.session_state.current_playing_level = i
-                        st.rerun()
-                else:
-                    st.button(f"Level {i} (Locked)", key=f"btn_{i}", disabled=True, use_container_width=True)
+        # ఉదాహరణకి ఒక్కో లెసన్ లో 5 టాస్క్ లు (Levels)
+        tasks_per_lesson = 5
+        total_levels = (len(df) // 10) + (1 if len(df) % 10 > 0 else 0)
+        total_lessons = (total_levels // tasks_per_lesson) + (1 if total_levels % tasks_per_lesson > 0 else 0)
+
+        for l in range(1, total_lessons + 1):
+            st.markdown(f"### 📘 Lesson {l}") # Lesson Heading
+            cols = st.columns(tasks_per_lesson)
+            
+            for t in range(1, tasks_per_lesson + 1):
+                level_num = ((l - 1) * tasks_per_lesson) + t
+                if level_num > total_levels: break
+                
+                with cols[t-1]:
+                    if level_num <= st.session_state.unlocked_level:
+                        if st.button(f"Task {t}\n⭐", key=f"lvl_{level_num}"):
+                            st.session_state.current_playing_level = level_num
+                            st.rerun()
+                    else:
+                        st.button(f"Task {t}\n🔒", key=f"lvl_{level_num}", disabled=True)
+            st.write("---")
         
-        # --- ఇక్కడ నువ్వు అడిగిన "Uploading" ఫీచర్ ---
-        st.write("---")
-        st.markdown("<h3 style='text-align: center; color: gray;'>⏳ Uploading more lessons...</h3>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>ప్రతిరోజూ కొత్త లెవల్స్ అప్‌లోడ్ చేయబడతాయి. వేచి ఉండండి!</p>", unsafe_allow_html=True)
-        st.progress(85) # ఒక చిన్న లోడింగ్ బార్ లాంటిది
-        
-    # Step 3: Quiz Screen (Instant Feedback Logic)
+        st.write("⏳ Uploading more lessons soon...")
+
+    # Step 3: Quiz Screen
     else:
         level = st.session_state.current_playing_level
-        st.header(f"Level {level} ⚡")
+        st.header(f"Task {level} ⚡")
         
         start_idx = (level - 1) * 10
-        end_idx = min(start_idx + 10, total_q)
+        end_idx = min(start_idx + 10, len(df))
         level_df = df.iloc[start_idx:end_idx]
         
-        correct_in_this_run = 0
-        
+        score = 0
+        all_answered = True
+
         for i, row in level_df.iterrows():
             st.markdown(f"**ప్రశ్న {i+1}:** {row['Question']}")
             opts = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
             
-            # యూజర్ ఆప్షన్ ఎంచుకోగానే వెంటనే రిజల్ట్
-            ans = st.radio(f"సమాధానం (Q{i+1}):", opts, index=None, key=f"radio_{i}")
-            
-            if ans:
-                if str(ans).strip() == str(row['Correct_Answer']).strip():
+            # ఒకసారి ఆన్సర్ ఇస్తే మార్చకుండా ఉండటానికి 'disabled' వాడుతున్నాం
+            key = f"q_{i}_lvl_{level}"
+            if key not in st.session_state:
+                st.session_state[key] = None
+
+            choice = st.radio(
+                "సమాధానం ఎంచుకోండి:", opts, 
+                index=None if st.session_state[key] is None else opts.index(st.session_state[key]),
+                key=f"radio_{i}",
+                disabled=st.session_state[key] is not None # ఆన్సర్ ఇచ్చాక Lock అయిపోతుంది
+            )
+
+            if choice and st.session_state[key] is None:
+                st.session_state[key] = choice
+                st.rerun()
+
+            if st.session_state[key]:
+                if str(st.session_state[key]).strip() == str(row['Correct_Answer']).strip():
                     st.success("Correct! ✅")
-                    correct_in_this_run += 1
+                    score += 1
                 else:
-                    st.error(f"Wrong! ❌ Correct Answer: {row['Correct_Answer']}")
+                    st.error(f"Wrong! ❌ Correct: {row['Correct_Answer']}")
+                    st.session_state.level_failed = True # ఒకటి తప్పు అయినా ఫెయిల్ కింద లెక్క
+            else:
+                all_answered = False
             st.write("---")
 
-        if st.button("Finish Level 🏁"):
-            if correct_in_this_run == len(level_df):
+        if all_answered:
+            if st.session_state.level_failed == False and score == len(level_df):
                 st.balloons()
-                st.success(f"అద్భుతం! లెవల్ {level} లో 10/10 సాధించారు! 🎉")
+                st.success("అద్భుతం! టాస్క్ పూర్తి చేసారు! 🔓")
                 if level == st.session_state.unlocked_level:
                     st.session_state.unlocked_level += 1
                 st.button("Map కి వెళ్ళు 🗺️", on_click=reset_to_map)
             else:
-                st.error(f"స్కోర్: {correct_in_this_run}/10. లెవల్ పాస్ అవ్వడానికి 10/10 రావాలి.")
-                st.button("మళ్ళీ ప్రయత్నించు 🔄", on_click=reset_to_map)
+                st.error(f"ఈ టాస్క్ లో తప్పులు ఉన్నాయి. పాస్ అవ్వడానికి 10/10 రావాలి!")
+                if st.button("Restart Task 🔄"):
+                    # ఆ లెవల్ కి సంబంధించిన ఆన్సర్స్ అన్నీ క్లియర్ చేయడం
+                    for k in list(st.session_state.keys()):
+                        if f"_lvl_{level}" in k: del st.session_state[k]
+                    st.session_state.level_failed = False
+                    st.rerun()
 
 except Exception as e:
-    st.error("Sheet Error: డేటా లోడ్ అవ్వలేదు లేదా షీట్ ఖాళీగా ఉంది.")
+    st.error("Sheet Error!")
