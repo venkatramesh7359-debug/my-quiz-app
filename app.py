@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import streamlit.components.v1 as components
+import time
 
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
-# 2. JavaScript to hide Footer
+# 2. JavaScript to hide Footer & Header
 components.html(
     """
     <script>
@@ -30,22 +31,29 @@ if 'current_playing_level' not in st.session_state: st.session_state.current_pla
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
 if 'level_failed' not in st.session_state: st.session_state.level_failed = False
 if 'retry_count' not in st.session_state: st.session_state.retry_count = {}
+if 'game_mode' not in st.session_state: st.session_state.game_mode = None
+if 'start_time' not in st.session_state: st.session_state.start_time = None
 
 # Reset function
 def reset_to_map():
     st.session_state.current_playing_level = None
     st.session_state.level_failed = False
+    st.session_state.game_mode = None
+    st.session_state.start_time = None
     st.rerun()
 
 # Retry function with full clear
 def restart_level(level):
-    # Attempt count penchithe widgets refresh avthayi
     if level not in st.session_state.retry_count:
         st.session_state.retry_count[level] = 1
     else:
         st.session_state.retry_count[level] += 1
     
-    # Patha selections anni delete cheyadam
+    # Mode mariyu timer reset
+    st.session_state.game_mode = None
+    st.session_state.start_time = None
+    
+    # Patha selections delete cheyadam
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
     for k in keys_to_del:
         del st.session_state[k]
@@ -84,11 +92,8 @@ try:
             total_rows = len(df)
             total_levels = (total_rows // rows_per_task)
             
-            # Displaying 10 lessons placeholder
             for l in range(1, 11):
                 start_row = (l - 1) * rows_per_lesson
-                
-                # Coming Soon Logic
                 current_name = "Coming Soon..."
                 if start_row < total_rows:
                     if 'lesson_name' in df.columns:
@@ -118,8 +123,42 @@ try:
             # Quiz Section
             level = st.session_state.current_playing_level
             attempt = st.session_state.retry_count.get(level, 0)
-            st.header(f"Task {level} ⚡")
             
+            # --- TIMER SELECTION STEP ---
+            if st.session_state.game_mode is None:
+                st.header(f"Task {level}: Game Mode Select Cheyandi")
+                st.write("Timer mode lo 5 minutes time untundi. Time ayipothey task reset avthundi!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Normal Mode (No Timer) 🧘"):
+                        st.session_state.game_mode = "normal"
+                        st.rerun()
+                with col2:
+                    if st.button("Speed Run (5 Mins) ⏱️"):
+                        st.session_state.game_mode = "timer"
+                        st.session_state.start_time = time.time()
+                        st.rerun()
+                if st.button("⬅️ Back to Map"):
+                    reset_to_map()
+                st.stop()
+
+            # --- LIVE TIMER LOGIC ---
+            if st.session_state.game_mode == "timer":
+                elapsed = time.time() - st.session_state.start_time
+                remaining = max(0, 300 - int(elapsed)) # 300 seconds = 5 mins
+                
+                if remaining <= 0:
+                    st.error("⏰ TIME UP! Mee 5 minutes time ayipoindi.")
+                    if st.button("Malli Prayatninchu (Retry) 🔄"):
+                        restart_level(level)
+                    st.stop()
+                
+                mins, secs = divmod(remaining, 60)
+                st.sidebar.metric("Remaining Time ⏳", f"{mins:02d}:{secs:02d}")
+                if remaining < 30: # Warning for last 30 seconds
+                    st.sidebar.warning("Tondaraga! Time ayiposthundi!")
+
+            st.header(f"Task {level} ⚡")
             start_idx = (level - 1) * 10
             level_df = df.iloc[start_idx : start_idx + 10]
             
@@ -130,9 +169,7 @@ try:
                 st.markdown(f"**Prasna {answered_count + 1}:** {row['question']}")
                 opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
                 
-                # Unique Key with Attempt ID to force clear
                 key = f"q_{i}_lvl_{level}_at_{attempt}"
-                
                 if key not in st.session_state:
                     st.session_state[key] = None
 
@@ -162,12 +199,12 @@ try:
                 st.subheader(f"📊 Result: {score}/10")
                 if not st.session_state.level_failed and score == 10:
                     st.balloons()
-                    st.success("Sabbash! 10/10 vachayi. Next level open ayindi! 🎉")
+                    st.success("Sabbash! Next level open ayindi! 🎉")
                     if level == st.session_state.unlocked_level:
                         st.session_state.unlocked_level += 1
                     st.button("Map ki vellu 🗺️", on_click=reset_to_map)
                 else:
-                    st.error("Try Again! 10 ki 10 vasthene next task open avthundi.")
+                    st.error("Try Again! Next task ki vellalante 10/10 ravali.")
                     if st.button("Retry Task 🔄"):
                         restart_level(level)
                     st.button("Map ki vellu 🗺️", on_click=reset_to_map)
