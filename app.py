@@ -35,7 +35,7 @@ if 'game_mode' not in st.session_state: st.session_state.game_mode = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 if 'final_submitted' not in st.session_state: st.session_state.final_submitted = False
 
-# Helper Functions
+# Functions
 def reset_to_map():
     st.session_state.current_playing_level = None
     st.session_state.game_mode = None
@@ -62,7 +62,6 @@ def load_data(url):
     except Exception:
         return None
 
-# Main Logic
 df = load_data(SHEET_URL)
 
 if df is not None:
@@ -85,10 +84,8 @@ if df is not None:
             start_row = (l - 1) * 50
             current_name = "Coming Soon..."
             if start_row < len(df):
-                if 'lesson_name' in df.columns:
-                    val = df.iloc[start_row]['lesson_name']
-                    if pd.notna(val): 
-                        current_name = str(val)
+                val = df.iloc[start_row]['lesson_name']
+                if pd.notna(val): current_name = str(val)
             
             st.markdown(f"### 📘 {current_name}") 
             if current_name != "Coming Soon...":
@@ -121,16 +118,81 @@ if df is not None:
                     st.session_state.game_mode = "timer"
                     st.session_state.start_time = time.time()
                     st.rerun()
-            if st.button("⬅️ Back to Map"): 
-                reset_to_map()
+            if st.button("⬅️ Back"): reset_to_map()
             st.stop()
 
-        # Timer Display
+        # Timer
         if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
-            st_autorefresh(interval=1000, key="timer_ref")
-            elapsed = time.time() - st.session_state.start_time
-            remaining = max(0, 300 - int(elapsed))
+            st_autorefresh(interval=1000, key="timer_refresh")
+            remaining = max(0, 300 - int(time.time() - st.session_state.start_time))
             mins, secs = divmod(remaining, 60)
             
-            st.markdown(f"""
-                <div style="background
+            # Simple string format to avoid triple quote issues
+            timer_html = f"<div style='background-color: #ff4b4b; padding: 10px; border-radius: 10px; text-align: center; color: white;'><h2 style='margin:0; color: white;'>⏳ {mins:02d}:{secs:02d}</h2></div><br>"
+            st.markdown(timer_html, unsafe_allow_html=True)
+            
+            if remaining <= 0:
+                st.error("⏰ TIME UP!")
+                st.button("Retry 🔄", on_click=restart_level, args=(level,))
+                st.stop()
+
+        # Questions
+        level_df = df.iloc[(level-1)*10 : level*10]
+        score = 0
+        answered_count = 0
+
+        for idx, (i, row) in enumerate(level_df.iterrows(), 1):
+            st.markdown(f"**ప్రశ్న {idx}:** {row['question']}")
+            ans_key = f"ans_{i}_lvl_{level}_at_{attempt}"
+            sub_key = f"sub_{i}_lvl_{level}_at_{attempt}"
+            
+            if sub_key not in st.session_state: st.session_state[sub_key] = False
+            
+            opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
+            correct_val = str(row['correct_answer']).strip()
+            
+            current_choice = st.radio(f"Opt {i}", opts, key=f"radio_{i}", 
+                                      index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), 
+                                      disabled=st.session_state[sub_key] or st.session_state.final_submitted, 
+                                      label_visibility="collapsed")
+            
+            if not st.session_state.final_submitted:
+                c1, c2 = st.columns([1, 2])
+                with c1:
+                    if not st.session_state[sub_key]:
+                        if st.button(f"Submit {idx}", key=f"s_{i}"):
+                            if current_choice:
+                                st.session_state[ans_key] = current_choice
+                                st.session_state[sub_key] = True
+                                st.rerun()
+                    else:
+                        if st.button(f"Edit {idx}", key=f"e_{i}"):
+                            st.session_state[sub_key] = False
+                            st.rerun()
+            
+            if st.session_state[sub_key]:
+                answered_count += 1
+                if st.session_state.final_submitted:
+                    user_ans = st.session_state.get(ans_key)
+                    if user_ans == correct_val:
+                        st.success(f"Meeru pettina answer: {user_ans} ✅")
+                        score += 1
+                    else:
+                        st.error(f"Meeru pettina answer: {user_ans} ❌")
+                        st.info(f"Correct: {correct_val}")
+            st.divider()
+
+        if answered_count == 10 and not st.session_state.final_submitted:
+            if st.button("🏁 Final Submit", type="primary", use_container_width=True):
+                st.session_state.final_submitted = True
+                st.rerun()
+
+        if st.session_state.final_submitted:
+            st.subheader(f"Score: {score}/10")
+            if score == 10:
+                st.balloons(); st.success("Task Complete! 🎉")
+                if level == st.session_state.unlocked_level: st.session_state.unlocked_level += 1
+            else:
+                st.error("10/10 ravali Next level kosam.")
+                if st.button("Retry Task 🔄"): restart_level(level)
+            st.button("Map 🗺️", on_click=reset_to_map)
