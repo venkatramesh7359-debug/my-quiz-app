@@ -64,13 +64,14 @@ def load_data(url):
 df = load_data(SHEET_URL)
 
 if df is not None:
-    # --- LOGIN SECTION ---
+    # --- LOGIN SECTION (Hidden Admin) ---
     if st.session_state.user_name == "":
         st.title("🎮 Venkat's Learning Quest")
-        name = st.text_input("మీ పేరు రాయండి (Admin కోసం పాస్‌వర్డ్ వాడండి):")
+        # ఇక్కడ Admin అనే పదాన్ని తీసేశాను, కేవలం మీకు మాత్రమే తెలిసిన పాస్‌వర్డ్ కొడితే చాలు
+        name = st.text_input("మీ పేరు రాయండి:") 
         if st.button("Start Game 🚀"):
-            if name.strip() == "admin7997": # ఇక్కడ పాస్‌వర్డ్ మార్చాను
-                st.session_state.user_name = "Admin"
+            if name.strip() == "admin7997": 
+                st.session_state.user_name = "Venkat" # అడ్మిన్ పేరు కూడా వెంకట్ అని కనిపిస్తుంది
                 st.session_state.is_admin = True
             elif name.strip():
                 st.session_state.user_name = name
@@ -80,11 +81,11 @@ if df is not None:
     # --- MAP SECTION ---
     elif st.session_state.current_playing_level is None:
         st.title("🗺️ Quiz Map")
-        status = " (ADMIN MODE)" if st.session_state.is_admin else ""
-        st.subheader(f"Player: {st.session_state.user_name}{status}")
+        st.subheader(f"Player: {st.session_state.user_name}")
         
+        # లెసన్స్ ని షీట్ లో ఉన్న ఆర్డర్ లోనే తీసుకోమని చెబుతున్నాం
         lessons = df['lesson_name'].unique()
-        global_task_counter = 1 # ఇది అన్‌లాక్ లెవెల్ ట్రాక్ చేయడానికి
+        global_task_counter = 1 
 
         for lesson in lessons:
             st.markdown(f"### 📘 {lesson}")
@@ -92,8 +93,8 @@ if df is not None:
             num_tasks = (len(lesson_df) // 10) + (1 if len(lesson_df) % 10 > 0 else 0)
             
             cols = st.columns(5)
+            # టాస్క్ ల ఆర్డర్ మిస్ అవ్వకుండా 1 నుండి num_tasks వరకు లూప్
             for t in range(1, num_tasks + 1):
-                # అడ్మిన్ అయితే అన్నీ ఓపెన్, యూజర్ అయితే unlocked_level వరకు మాత్రమే
                 is_unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked_level
                 
                 with cols[(t-1)%5]:
@@ -140,7 +141,7 @@ if df is not None:
             if remaining <= 0:
                 st.error("⏰ TIME UP!"); st.button("Retry 🔄", on_click=restart_level, args=(level_id,)); st.stop()
 
-        # Logic to get 10 questions for the specific task
+        # Filtering questions in strict order
         lesson_full_df = df[df['lesson_name'] == lesson]
         start_row = (task_num - 1) * 10
         level_df = lesson_full_df.iloc[start_row : start_row + 10]
@@ -195,7 +196,6 @@ if df is not None:
             st.subheader(f"📊 Score: {score}/{len(level_df)}")
             if score == len(level_df):
                 st.balloons()
-                # ఒకవేళ యూజర్ ప్రస్తుత అన్‌లాక్ లెవెల్ లో ఉంటేనే నెక్స్ట్ లెవెల్ అన్‌లాక్ అవుతుంది
                 if st.session_state.global_task_id == st.session_state.unlocked_level:
                     st.session_state.unlocked_level += 1
             st.button("Map 🗺️", on_click=reset_to_map)
