@@ -54,7 +54,6 @@ def restart_level(level):
     st.session_state.game_mode = None
     st.session_state.start_time = None
     st.session_state.final_submitted = False
-    # Clear all answer keys
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
     for k in keys_to_del:
         del st.session_state[k]
@@ -133,17 +132,28 @@ try:
                     reset_to_map()
                 st.stop()
 
+            # --- TIMER SECTION (MAIN SCREEN LO UNTUNDI) ---
             if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
                 st_autorefresh(interval=1000, key="quiz_timer")
                 elapsed = time.time() - st.session_state.start_time
                 remaining = max(0, 300 - int(elapsed))
                 mins, secs = divmod(remaining, 60)
-                st.sidebar.markdown(f"## ⏳ Time: {mins:02d}:{secs:02d}")
+                
+                # Highlighted Timer Box for Mobile visibility
+                st.markdown(
+                    f"""
+                    <div style="background-color: #ff4b4b; padding: 10px; border-radius: 10px; text-align: center; color: white;">
+                        <h2 style="margin:0;">⏳ Time Left: {mins:02d}:{secs:02d}</h2>
+                    </div>
+                    """, unsafe_header_custom=True, unsafe_allow_html=True
+                )
+                
                 if remaining <= 0:
                     st.error("⏰ TIME UP!")
                     if st.button("Malli Modalu Pettu 🔄"):
                         restart_level(level)
                     st.stop()
+            # ----------------------------------------------
 
             st.header(f"Task {level}")
             start_idx = (level - 1) * 10
@@ -162,7 +172,6 @@ try:
                 
                 if sub_key not in st.session_state: st.session_state[sub_key] = False
 
-                # Selection
                 choice = st.radio(
                     "సరైన ఆప్షన్ ఎంచుకోండి:", opts, 
                     key=f"radio_{ans_key}",
@@ -170,7 +179,6 @@ try:
                     disabled=st.session_state[sub_key] or st.session_state.final_submitted
                 )
                 
-                # Buttons Row
                 if not st.session_state.final_submitted:
                     c1, c2 = st.columns(2)
                     with c1:
@@ -188,7 +196,6 @@ try:
                                 st.session_state[sub_key] = False
                                 st.rerun()
 
-                # Review Results after final submit
                 if st.session_state.final_submitted:
                     user_ans = st.session_state.get(ans_key)
                     correct = str(row['correct_answer']).strip()
@@ -204,13 +211,11 @@ try:
                     answered_count += 1
                 st.write("---")
 
-            # Final Submit Button
             if answered_count == 10 and not st.session_state.final_submitted:
                 if st.button("🏁 Final Submit Task", type="primary", use_container_width=True):
                     st.session_state.final_submitted = True
                     st.rerun()
 
-            # Results Section
             if st.session_state.final_submitted:
                 st.subheader(f"📊 మొత్తం స్కోరు: {score}/10")
                 if score == 10:
