@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
-# 2. JavaScript to hide Footer & Header
+# 2. JavaScript to hide Footer & Header (App look ravalante idi avasaram)
 components.html(
     """
     <script>
@@ -132,20 +132,20 @@ try:
                     reset_to_map()
                 st.stop()
 
-            # --- TIMER SECTION (MAIN SCREEN LO UNTUNDI) ---
+            # --- TIMER DISPLAY (MAIN SECTION) ---
             if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
                 st_autorefresh(interval=1000, key="quiz_timer")
                 elapsed = time.time() - st.session_state.start_time
                 remaining = max(0, 300 - int(elapsed))
                 mins, secs = divmod(remaining, 60)
                 
-                # Highlighted Timer Box for Mobile visibility
+                # Mobile lo clear ga kanipinche Red Box
                 st.markdown(
                     f"""
-                    <div style="background-color: #ff4b4b; padding: 10px; border-radius: 10px; text-align: center; color: white;">
-                        <h2 style="margin:0;">⏳ Time Left: {mins:02d}:{secs:02d}</h2>
+                    <div style="background-color: #ff4b4b; padding: 15px; border-radius: 10px; text-align: center; color: white; margin-bottom: 20px;">
+                        <h2 style="margin:0; color: white; font-family: sans-serif;">⏳ Time Left: {mins:02d}:{secs:02d}</h2>
                     </div>
-                    """, unsafe_header_custom=True, unsafe_allow_html=True
+                    """, unsafe_allow_html=True
                 )
                 
                 if remaining <= 0:
@@ -153,7 +153,6 @@ try:
                     if st.button("Malli Modalu Pettu 🔄"):
                         restart_level(level)
                     st.stop()
-            # ----------------------------------------------
 
             st.header(f"Task {level}")
             start_idx = (level - 1) * 10
@@ -232,3 +231,4 @@ try:
 
 except Exception as e:
     st.error(f"Error: {e}")
+
