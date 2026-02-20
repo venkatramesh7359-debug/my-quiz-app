@@ -34,6 +34,7 @@ if 'level_failed' not in st.session_state: st.session_state.level_failed = False
 if 'retry_count' not in st.session_state: st.session_state.retry_count = {}
 if 'game_mode' not in st.session_state: st.session_state.game_mode = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
+if 'final_submitted' not in st.session_state: st.session_state.final_submitted = False
 
 # Reset function
 def reset_to_map():
@@ -41,6 +42,7 @@ def reset_to_map():
     st.session_state.level_failed = False
     st.session_state.game_mode = None
     st.session_state.start_time = None
+    st.session_state.final_submitted = False
     st.rerun()
 
 # Retry function
@@ -51,6 +53,8 @@ def restart_level(level):
         st.session_state.retry_count[level] += 1
     st.session_state.game_mode = None
     st.session_state.start_time = None
+    st.session_state.final_submitted = False
+    # Clear all answer keys
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
     for k in keys_to_del:
         del st.session_state[k]
@@ -107,8 +111,6 @@ try:
                                         st.rerun()
                                 else:
                                     st.button(f"Task {t}\n🔒", key=f"btn_{level_num}", disabled=True)
-                else:
-                    st.info("Ee lesson inka tayaru avuthundi... 🛠️")
                 st.write("---")
 
         else:
@@ -131,7 +133,7 @@ try:
                     reset_to_map()
                 st.stop()
 
-            if st.session_state.game_mode == "timer":
+            if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
                 st_autorefresh(interval=1000, key="quiz_timer")
                 elapsed = time.time() - st.session_state.start_time
                 remaining = max(0, 300 - int(elapsed))
@@ -150,9 +152,8 @@ try:
             score = 0
             answered_count = 0
 
-            # Question numbering loop
             for q_num, (i, row) in enumerate(level_df.iterrows(), 1):
-                st.markdown(f"### ప్రశ్న {q_num}") # TELUGU NUMBERING SET HERE
+                st.markdown(f"### ప్రశ్న {q_num}")
                 st.write(row['question'])
                 opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
                 
@@ -161,46 +162,66 @@ try:
                 
                 if sub_key not in st.session_state: st.session_state[sub_key] = False
 
+                # Selection
                 choice = st.radio(
                     "సరైన ఆప్షన్ ఎంచుకోండి:", opts, 
                     key=f"radio_{ans_key}",
                     index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]),
-                    disabled=st.session_state[sub_key]
+                    disabled=st.session_state[sub_key] or st.session_state.final_submitted
                 )
                 
-                if not st.session_state[sub_key]:
-                    if st.button(f"సమర్పించు (Submit) {q_num} ✅", key=f"btn_sub_{i}"):
-                        if choice:
-                            st.session_state[ans_key] = choice
-                            st.session_state[sub_key] = True
-                            st.rerun()
-                        else:
-                            st.warning("దయచేసి ఒక ఆప్షన్ ఎంచుకోండి!")
+                # Buttons Row
+                if not st.session_state.final_submitted:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if not st.session_state[sub_key]:
+                            if st.button(f"Submit {q_num} ✅", key=f"btn_sub_{i}"):
+                                if choice:
+                                    st.session_state[ans_key] = choice
+                                    st.session_state[sub_key] = True
+                                    st.rerun()
+                                else:
+                                    st.warning("Select option!")
+                    with c2:
+                        if st.session_state[sub_key]:
+                            if st.button(f"Change Answer {q_num} ✏️", key=f"btn_edit_{i}"):
+                                st.session_state[sub_key] = False
+                                st.rerun()
 
-                if st.session_state[sub_key]:
-                    answered_count += 1
-                    user_ans = st.session_state[ans_key]
-                    correct = str(row['correct_answer']).strip().lower()
-                    
-                    if str(user_ans).strip().lower() == correct:
-                        st.success(f"సరైన సమాధానం! ✅: {user_ans}")
+                # Review Results after final submit
+                if st.session_state.final_submitted:
+                    user_ans = st.session_state.get(ans_key)
+                    correct = str(row['correct_answer']).strip()
+                    if user_ans == correct:
+                        st.success(f"మీరు పెట్టిన సమాధానం: {user_ans} ✅")
                         score += 1
                     else:
-                        st.error(f"తప్పు! ❌ సరైన సమాధానం: {row['correct_answer']}")
+                        st.error(f"మీరు పెట్టిన సమాధానం: {user_ans} ❌")
+                        st.info(f"సరైన సమాధానం: {correct}")
                         st.session_state.level_failed = True
+                
+                if st.session_state[sub_key]:
+                    answered_count += 1
                 st.write("---")
 
-            if answered_count == 10:
+            # Final Submit Button
+            if answered_count == 10 and not st.session_state.final_submitted:
+                if st.button("🏁 Final Submit Task", type="primary", use_container_width=True):
+                    st.session_state.final_submitted = True
+                    st.rerun()
+
+            # Results Section
+            if st.session_state.final_submitted:
                 st.subheader(f"📊 మొత్తం స్కోరు: {score}/10")
-                if not st.session_state.level_failed and score == 10:
+                if score == 10:
                     st.balloons()
                     st.success("శభాష్! అన్ని ప్రశ్నలకు సరిగ్గా సమాధానం ఇచ్చారు. 🎉")
                     if level == st.session_state.unlocked_level:
                         st.session_state.unlocked_level += 1
                     st.button("మ్యాప్ కి వెళ్ళు 🗺️", on_click=reset_to_map)
                 else:
-                    st.error("క్షమించండి! 10 కి 10 వస్తేనే తదుపరి టాస్క్ ఓపెన్ అవుతుంది.")
-                    if st.button("మళ్ళీ ప్రయత్నించు 🔄"):
+                    st.error("10/10 వస్తేనే తదుపరి టాస్క్ ఓపెన్ అవుతుంది.")
+                    if st.button("Retry Task 🔄"):
                         restart_level(level)
                     st.button("మ్యాప్ కి వెళ్ళు 🗺️", on_click=reset_to_map)
 
