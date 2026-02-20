@@ -49,14 +49,11 @@ def restart_level(level):
         st.session_state.retry_count[level] = 1
     else:
         st.session_state.retry_count[level] += 1
-    
     st.session_state.game_mode = None
     st.session_state.start_time = None
-    
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
     for k in keys_to_del:
         del st.session_state[k]
-        
     st.session_state.level_failed = False
     st.rerun()
 
@@ -73,7 +70,6 @@ def load_data(url):
 
 try:
     df = load_data(SHEET_URL)
-    
     if df is not None:
         if st.session_state.user_name == "":
             name = st.text_input("Me peru rasivvandi:")
@@ -84,7 +80,6 @@ try:
         
         elif st.session_state.current_playing_level is None:
             st.subheader(f"Player: {st.session_state.user_name}")
-            
             tasks_per_lesson = 5
             rows_per_task = 10
             rows_per_lesson = tasks_per_lesson * rows_per_task
@@ -99,9 +94,7 @@ try:
                         val = df.iloc[start_row]['lesson_name']
                         if pd.notna(val) and str(val).strip() != "":
                             current_name = str(val)
-                
                 st.markdown(f"### 📘 {current_name}") 
-                
                 if current_name != "Coming Soon...":
                     cols = st.columns(tasks_per_lesson)
                     for t in range(1, tasks_per_lesson + 1):
@@ -122,7 +115,6 @@ try:
             level = st.session_state.current_playing_level
             attempt = st.session_state.retry_count.get(level, 0)
             
-            # --- TIMER MODE SELECTION ---
             if st.session_state.game_mode is None:
                 st.header(f"Task {level}: Mode Select Cheyandi")
                 col1, col2 = st.columns(2)
@@ -139,25 +131,19 @@ try:
                     reset_to_map()
                 st.stop()
 
-            # --- DYNAMIC REFRESH TIMER ---
             if st.session_state.game_mode == "timer":
-                # Auto-refresh every 1 second
                 st_autorefresh(interval=1000, key="quiz_timer")
-                
                 elapsed = time.time() - st.session_state.start_time
                 remaining = max(0, 300 - int(elapsed))
-                
                 mins, secs = divmod(remaining, 60)
-                # Sidebar lo live timer chupinchadam
                 st.sidebar.markdown(f"## ⏳ Time: {mins:02d}:{secs:02d}")
-                
                 if remaining <= 0:
-                    st.error("⏰ TIME UP! Task reset ayyindi.")
+                    st.error("⏰ TIME UP!")
                     if st.button("Malli Modalu Pettu 🔄"):
                         restart_level(level)
                     st.stop()
 
-            st.header(f"Task {level} {'⏱️' if st.session_state.game_mode == 'timer' else ''}")
+            st.header(f"Task {level}")
             start_idx = (level - 1) * 10
             level_df = df.iloc[start_idx : start_idx + 10]
             
@@ -165,37 +151,50 @@ try:
             answered_count = 0
 
             for i, row in level_df.iterrows():
-                st.markdown(f"**Prasna {answered_count + 1}:** {row['question']}")
+                st.markdown(f"### Prasna {answered_count + 1}")
+                st.write(row['question'])
                 opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
                 
-                key = f"q_{i}_lvl_{level}_at_{attempt}"
-                if key not in st.session_state:
-                    st.session_state[key] = None
+                # Session keys
+                ans_key = f"ans_{i}_lvl_{level}_at_{attempt}"
+                sub_key = f"sub_{i}_lvl_{level}_at_{attempt}"
+                
+                if sub_key not in st.session_state: st.session_state[sub_key] = False
 
+                # Radio selection
                 choice = st.radio(
                     "Sariyna option enchukondi:", opts, 
-                    index=None if st.session_state[key] is None else opts.index(st.session_state[key]),
-                    key=f"radio_{key}",
-                    disabled=st.session_state[key] is not None
+                    key=f"radio_{ans_key}",
+                    index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]),
+                    disabled=st.session_state[sub_key]
                 )
+                
+                # Submit Button for each question
+                if not st.session_state[sub_key]:
+                    if st.button(f"Submit Answer {answered_count + 1} ✅", key=f"btn_sub_{i}"):
+                        if choice:
+                            st.session_state[ans_key] = choice
+                            st.session_state[sub_key] = True
+                            st.rerun()
+                        else:
+                            st.warning("Please select an option first!")
 
-                if choice and st.session_state[key] is None:
-                    st.session_state[key] = choice
-                    st.rerun()
-
-                if st.session_state[key]:
+                # Result display after submit
+                if st.session_state[sub_key]:
                     answered_count += 1
+                    user_ans = st.session_state[ans_key]
                     correct = str(row['correct_answer']).strip().lower()
-                    if str(st.session_state[key]).strip().lower() == correct:
-                        st.success("Correct! ✅")
+                    
+                    if str(user_ans).strip().lower() == correct:
+                        st.success(f"Correct! ✅ Your choice: {user_ans}")
                         score += 1
                     else:
-                        st.error(f"Wrong! ❌ Correct: {row['correct_answer']}")
+                        st.error(f"Wrong! ❌ Correct Answer: {row['correct_answer']}")
                         st.session_state.level_failed = True
                 st.write("---")
 
             if answered_count == 10:
-                st.subheader(f"📊 Result: {score}/10")
+                st.subheader(f"📊 Final Score: {score}/10")
                 if not st.session_state.level_failed and score == 10:
                     st.balloons()
                     st.success("Sabbash! Task Completed! 🎉")
@@ -203,7 +202,7 @@ try:
                         st.session_state.unlocked_level += 1
                     st.button("Map ki vellu 🗺️", on_click=reset_to_map)
                 else:
-                    st.error("10/10 vasthene next level open avthundi.")
+                    st.error("Malli Prayatninchu (10/10 kavali).")
                     if st.button("Retry Task 🔄"):
                         restart_level(level)
                     st.button("Map ki vellu 🗺️", on_click=reset_to_map)
