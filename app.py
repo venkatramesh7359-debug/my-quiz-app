@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
-# 2. JavaScript to hide Footer & Header (App look ravalante idi avasaram)
+# 2. JavaScript to hide Footer & Header
 components.html(
     """
     <script>
@@ -62,7 +62,8 @@ def restart_level(level):
 
 st.title("🎮 Venkat's Learning Quest")
 
-@st.cache_data(ttl=0)
+# --- FIXED LOAD DATA (No Blinking) ---
+@st.cache_data(ttl=0, show_spinner=False)
 def load_data(url):
     try:
         data = pd.read_csv(url)
@@ -132,14 +133,13 @@ try:
                     reset_to_map()
                 st.stop()
 
-            # --- TIMER DISPLAY (MAIN SECTION) ---
+            # --- TIMER DISPLAY (Mobile Friendly) ---
             if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
                 st_autorefresh(interval=1000, key="quiz_timer")
                 elapsed = time.time() - st.session_state.start_time
                 remaining = max(0, 300 - int(elapsed))
                 mins, secs = divmod(remaining, 60)
                 
-                # Mobile lo clear ga kanipinche Red Box
                 st.markdown(
                     f"""
                     <div style="background-color: #ff4b4b; padding: 15px; border-radius: 10px; text-align: center; color: white; margin-bottom: 20px;">
@@ -231,4 +231,3 @@ try:
 
 except Exception as e:
     st.error(f"Error: {e}")
-
