@@ -150,62 +150,59 @@ try:
             score = 0
             answered_count = 0
 
-            for i, row in level_df.iterrows():
-                st.markdown(f"### Prasna {answered_count + 1}")
+            # Question numbering loop
+            for q_num, (i, row) in enumerate(level_df.iterrows(), 1):
+                st.markdown(f"### ప్రశ్న {q_num}") # TELUGU NUMBERING SET HERE
                 st.write(row['question'])
                 opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
                 
-                # Session keys
                 ans_key = f"ans_{i}_lvl_{level}_at_{attempt}"
                 sub_key = f"sub_{i}_lvl_{level}_at_{attempt}"
                 
                 if sub_key not in st.session_state: st.session_state[sub_key] = False
 
-                # Radio selection
                 choice = st.radio(
-                    "Sariyna option enchukondi:", opts, 
+                    "సరైన ఆప్షన్ ఎంచుకోండి:", opts, 
                     key=f"radio_{ans_key}",
                     index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]),
                     disabled=st.session_state[sub_key]
                 )
                 
-                # Submit Button for each question
                 if not st.session_state[sub_key]:
-                    if st.button(f"Submit Answer {answered_count + 1} ✅", key=f"btn_sub_{i}"):
+                    if st.button(f"సమర్పించు (Submit) {q_num} ✅", key=f"btn_sub_{i}"):
                         if choice:
                             st.session_state[ans_key] = choice
                             st.session_state[sub_key] = True
                             st.rerun()
                         else:
-                            st.warning("Please select an option first!")
+                            st.warning("దయచేసి ఒక ఆప్షన్ ఎంచుకోండి!")
 
-                # Result display after submit
                 if st.session_state[sub_key]:
                     answered_count += 1
                     user_ans = st.session_state[ans_key]
                     correct = str(row['correct_answer']).strip().lower()
                     
                     if str(user_ans).strip().lower() == correct:
-                        st.success(f"Correct! ✅ Your choice: {user_ans}")
+                        st.success(f"సరైన సమాధానం! ✅: {user_ans}")
                         score += 1
                     else:
-                        st.error(f"Wrong! ❌ Correct Answer: {row['correct_answer']}")
+                        st.error(f"తప్పు! ❌ సరైన సమాధానం: {row['correct_answer']}")
                         st.session_state.level_failed = True
                 st.write("---")
 
             if answered_count == 10:
-                st.subheader(f"📊 Final Score: {score}/10")
+                st.subheader(f"📊 మొత్తం స్కోరు: {score}/10")
                 if not st.session_state.level_failed and score == 10:
                     st.balloons()
-                    st.success("Sabbash! Task Completed! 🎉")
+                    st.success("శభాష్! అన్ని ప్రశ్నలకు సరిగ్గా సమాధానం ఇచ్చారు. 🎉")
                     if level == st.session_state.unlocked_level:
                         st.session_state.unlocked_level += 1
-                    st.button("Map ki vellu 🗺️", on_click=reset_to_map)
+                    st.button("మ్యాప్ కి వెళ్ళు 🗺️", on_click=reset_to_map)
                 else:
-                    st.error("Malli Prayatninchu (10/10 kavali).")
-                    if st.button("Retry Task 🔄"):
+                    st.error("క్షమించండి! 10 కి 10 వస్తేనే తదుపరి టాస్క్ ఓపెన్ అవుతుంది.")
+                    if st.button("మళ్ళీ ప్రయత్నించు 🔄"):
                         restart_level(level)
-                    st.button("Map ki vellu 🗺️", on_click=reset_to_map)
+                    st.button("మ్యాప్ కి వెళ్ళు 🗺️", on_click=reset_to_map)
 
 except Exception as e:
     st.error(f"Error: {e}")
