@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import streamlit.components.v1 as components
 import time
+from streamlit_autorefresh import st_autorefresh
 
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
@@ -42,18 +43,16 @@ def reset_to_map():
     st.session_state.start_time = None
     st.rerun()
 
-# Retry function with full clear
+# Retry function
 def restart_level(level):
     if level not in st.session_state.retry_count:
         st.session_state.retry_count[level] = 1
     else:
         st.session_state.retry_count[level] += 1
     
-    # Mode mariyu timer reset
     st.session_state.game_mode = None
     st.session_state.start_time = None
     
-    # Patha selections delete cheyadam
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
     for k in keys_to_del:
         del st.session_state[k]
@@ -120,17 +119,15 @@ try:
                 st.write("---")
 
         else:
-            # Quiz Section
             level = st.session_state.current_playing_level
             attempt = st.session_state.retry_count.get(level, 0)
             
-            # --- TIMER SELECTION STEP ---
+            # --- TIMER MODE SELECTION ---
             if st.session_state.game_mode is None:
-                st.header(f"Task {level}: Game Mode Select Cheyandi")
-                st.write("Timer mode lo 5 minutes time untundi. Time ayipothey task reset avthundi!")
+                st.header(f"Task {level}: Mode Select Cheyandi")
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("Normal Mode (No Timer) 🧘"):
+                    if st.button("Normal Mode 🧘"):
                         st.session_state.game_mode = "normal"
                         st.rerun()
                 with col2:
@@ -142,23 +139,25 @@ try:
                     reset_to_map()
                 st.stop()
 
-            # --- LIVE TIMER LOGIC ---
+            # --- DYNAMIC REFRESH TIMER ---
             if st.session_state.game_mode == "timer":
-                elapsed = time.time() - st.session_state.start_time
-                remaining = max(0, 300 - int(elapsed)) # 300 seconds = 5 mins
+                # Auto-refresh every 1 second
+                st_autorefresh(interval=1000, key="quiz_timer")
                 
-                if remaining <= 0:
-                    st.error("⏰ TIME UP! Mee 5 minutes time ayipoindi.")
-                    if st.button("Malli Prayatninchu (Retry) 🔄"):
-                        restart_level(level)
-                    st.stop()
+                elapsed = time.time() - st.session_state.start_time
+                remaining = max(0, 300 - int(elapsed))
                 
                 mins, secs = divmod(remaining, 60)
-                st.sidebar.metric("Remaining Time ⏳", f"{mins:02d}:{secs:02d}")
-                if remaining < 30: # Warning for last 30 seconds
-                    st.sidebar.warning("Tondaraga! Time ayiposthundi!")
+                # Sidebar lo live timer chupinchadam
+                st.sidebar.markdown(f"## ⏳ Time: {mins:02d}:{secs:02d}")
+                
+                if remaining <= 0:
+                    st.error("⏰ TIME UP! Task reset ayyindi.")
+                    if st.button("Malli Modalu Pettu 🔄"):
+                        restart_level(level)
+                    st.stop()
 
-            st.header(f"Task {level} ⚡")
+            st.header(f"Task {level} {'⏱️' if st.session_state.game_mode == 'timer' else ''}")
             start_idx = (level - 1) * 10
             level_df = df.iloc[start_idx : start_idx + 10]
             
@@ -199,12 +198,12 @@ try:
                 st.subheader(f"📊 Result: {score}/10")
                 if not st.session_state.level_failed and score == 10:
                     st.balloons()
-                    st.success("Sabbash! Next level open ayindi! 🎉")
+                    st.success("Sabbash! Task Completed! 🎉")
                     if level == st.session_state.unlocked_level:
                         st.session_state.unlocked_level += 1
                     st.button("Map ki vellu 🗺️", on_click=reset_to_map)
                 else:
-                    st.error("Try Again! Next task ki vellalante 10/10 ravali.")
+                    st.error("10/10 vasthene next level open avthundi.")
                     if st.button("Retry Task 🔄"):
                         restart_level(level)
                     st.button("Map ki vellu 🗺️", on_click=reset_to_map)
