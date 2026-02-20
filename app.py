@@ -49,7 +49,6 @@ def restart_level(level):
     st.session_state.game_mode = None
     st.session_state.start_time = None
     st.session_state.final_submitted = False
-    # Specific keys matrame delete chesthunnam
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
     for k in keys_to_del: del st.session_state[k]
     st.rerun()
@@ -119,18 +118,13 @@ if df is not None:
             if st.button("⬅️ Back"): reset_to_map()
             st.stop()
 
-        # --- SMART TIMER SECTION ---
+        # --- TIMER SECTION ---
         if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
-            # Refresh limited to 1 second
-            st_autorefresh(interval=1000, key="timer_ref", limit=None)
+            st_autorefresh(interval=1000, key="timer_ref")
             remaining = max(0, 300 - int(time.time() - st.session_state.start_time))
             mins, secs = divmod(remaining, 60)
-            
-            st.markdown(f"""
-                <div style="background-color: #ff4b4b; padding: 10px; border-radius: 10px; text-align: center; color: white;">
-                    <h2 style="margin:0;">⏳ {mins:02d}:{secs:02d}</h2>
-                </div><br>""", unsafe_allow_html=True)
-            
+            st.markdown(f"""<div style="background-color: #ff4b4b; padding: 10px; border-radius: 10px; text-align: center; color: white;">
+                <h2 style="margin:0;">⏳ {mins:02d}:{secs:02d}</h2></div><br>""", unsafe_allow_html=True)
             if remaining <= 0:
                 st.error("⏰ TIME UP!"); st.button("Retry 🔄", on_click=restart_level, args=(level,)); st.stop()
 
@@ -147,42 +141,58 @@ if df is not None:
             if sub_key not in st.session_state: st.session_state[sub_key] = False
             
             opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
+            correct_val = str(row['correct_answer']).strip()
             
-            # Selection
-            current_choice = st.radio("Options:", opts, key=f"radio_{i}", index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), disabled=st.session_state[sub_key] or st.session_state.final_submitted, label_visibility="collapsed")
+            # Selection Widget
+            current_choice = st.radio(f"Opt_{i}", opts, key=f"radio_{i}", 
+                                      index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), 
+                                      disabled=st.session_state[sub_key] or st.session_state.final_submitted, 
+                                      label_visibility="collapsed")
             
+            # Individual Question Submit/Edit
             if not st.session_state.final_submitted:
                 c1, c2 = st.columns([1, 2])
                 with c1:
                     if not st.session_state[sub_key]:
-                        if st.button(f"Submit {idx}", key=f"s_{i}"):
+                        if st.button(f"Submit {idx} ✅", key=f"s_{i}"):
                             if current_choice:
                                 st.session_state[ans_key] = current_choice
                                 st.session_state[sub_key] = True
                                 st.rerun()
                     else:
-                        if st.button(f"Edit {idx}", key=f"e_{i}"):
+                        if st.button(f"Edit {idx} ✏️", key=f"e_{i}"):
                             st.session_state[sub_key] = False
                             st.rerun()
             
+            # RESULT VISIBILITY AFTER FINAL SUBMIT
             if st.session_state[sub_key]:
                 answered_count += 1
                 if st.session_state.final_submitted:
-                    if st.session_state[ans_key] == str(row['correct_answer']).strip():
-                        st.success(f"Correct! ✅"); score += 1
+                    user_ans = st.session_state.get(ans_key)
+                    if user_ans == correct_val:
+                        st.success(f"మీ సమాధానం: {user_ans} ✅ (Correct!)")
+                        score += 1
                     else:
-                        st.error(f"Wrong ❌ (Ans: {row['correct_answer']})")
+                        st.error(f"మీ సమాధానం: {user_ans} ❌")
+                        st.info(f"సరైన సమాధానం: {correct_val}")
+            
             st.divider()
 
+        # Final Submit Button
         if answered_count == 10 and not st.session_state.final_submitted:
-            if st.button("🏁 Final Submit", type="primary", use_container_width=True):
+            if st.button("🏁 Final Submit Task", type="primary", use_container_width=True):
                 st.session_state.final_submitted = True
                 st.rerun()
 
+        # Result Summary
         if st.session_state.final_submitted:
-            st.subheader(f"Score: {score}/10")
+            st.subheader(f"📊 Score: {score}/10")
             if score == 10:
-                st.balloons(); st.success("Task Complete! 🎉")
+                st.balloons(); st.success("అద్భుతం! లెవెల్ పూర్తి చేసారు. 🎉")
                 if level == st.session_state.unlocked_level: st.session_state.unlocked_level += 1
-            else: st.error("10/10 వస్తేనే నెక్స్ట్ లెవెల్ అన్లాక్ అవుతుంది.")
-            st.button("Map 🗺️", on_click=reset_to_map)
+            else: 
+                st.error("తదుపరి లెవెల్ అన్లాక్ అవ్వాలంటే 10/10 రావాలి.")
+            st.button("మ్యాప్ కి వెళ్ళు 🗺️", on_click=reset_to_map)
+
+except Exception as e:
+    st.error(f"Error: {e}")
