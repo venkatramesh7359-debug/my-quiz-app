@@ -35,7 +35,7 @@ if 'game_mode' not in st.session_state: st.session_state.game_mode = None
 if 'start_time' not in st.session_state: st.session_state.start_time = None
 if 'final_submitted' not in st.session_state: st.session_state.final_submitted = False
 
-# Reset function
+# Helper Functions
 def reset_to_map():
     st.session_state.current_playing_level = None
     st.session_state.game_mode = None
@@ -43,14 +43,14 @@ def reset_to_map():
     st.session_state.final_submitted = False
     st.rerun()
 
-# Retry function
 def restart_level(level):
     st.session_state.retry_count[level] = st.session_state.retry_count.get(level, 0) + 1
     st.session_state.game_mode = None
     st.session_state.start_time = None
     st.session_state.final_submitted = False
     keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level}" in k]
-    for k in keys_to_del: del st.session_state[k]
+    for k in keys_to_del: 
+        del st.session_state[k]
     st.rerun()
 
 @st.cache_data(show_spinner=False)
@@ -59,12 +59,15 @@ def load_data(url):
         data = pd.read_csv(url)
         data.columns = [c.strip().lower().replace(' ', '_') for c in data.columns]
         return data
-    except: return None
+    except Exception:
+        return None
 
+# Main Logic
 df = load_data(SHEET_URL)
 
 if df is not None:
     if st.session_state.user_name == "":
+        st.title("🎮 Venkat's Learning Quest")
         name = st.text_input("Me peru rasivvandi:")
         if st.button("Start Game 🚀"):
             if name.strip():
@@ -72,7 +75,7 @@ if df is not None:
                 st.rerun()
     
     elif st.session_state.current_playing_level is None:
-        st.title("🎮 Venkat's Learning Quest")
+        st.title("🎮 Quiz Map")
         st.subheader(f"Player: {st.session_state.user_name}")
         tasks_per_lesson = 5
         rows_per_task = 10
@@ -82,8 +85,10 @@ if df is not None:
             start_row = (l - 1) * 50
             current_name = "Coming Soon..."
             if start_row < len(df):
-                val = df.iloc[start_row]['lesson_name']
-                if pd.notna(val): current_name = str(val)
+                if 'lesson_name' in df.columns:
+                    val = df.iloc[start_row]['lesson_name']
+                    if pd.notna(val): 
+                        current_name = str(val)
             
             st.markdown(f"### 📘 {current_name}") 
             if current_name != "Coming Soon...":
@@ -109,90 +114,23 @@ if df is not None:
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("Normal Mode 🧘"):
-                    st.session_state.game_mode = "normal"; st.rerun()
+                    st.session_state.game_mode = "normal"
+                    st.rerun()
             with c2:
                 if st.button("Speed Run ⏱️"):
                     st.session_state.game_mode = "timer"
                     st.session_state.start_time = time.time()
                     st.rerun()
-            if st.button("⬅️ Back"): reset_to_map()
+            if st.button("⬅️ Back to Map"): 
+                reset_to_map()
             st.stop()
 
-        # --- TIMER SECTION ---
+        # Timer Display
         if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
             st_autorefresh(interval=1000, key="timer_ref")
-            remaining = max(0, 300 - int(time.time() - st.session_state.start_time))
+            elapsed = time.time() - st.session_state.start_time
+            remaining = max(0, 300 - int(elapsed))
             mins, secs = divmod(remaining, 60)
-            st.markdown(f"""<div style="background-color: #ff4b4b; padding: 10px; border-radius: 10px; text-align: center; color: white;">
-                <h2 style="margin:0;">⏳ {mins:02d}:{secs:02d}</h2></div><br>""", unsafe_allow_html=True)
-            if remaining <= 0:
-                st.error("⏰ TIME UP!"); st.button("Retry 🔄", on_click=restart_level, args=(level,)); st.stop()
-
-        # Questions Display
-        level_df = df.iloc[(level-1)*10 : level*10]
-        score = 0
-        answered_count = 0
-
-        for idx, (i, row) in enumerate(level_df.iterrows(), 1):
-            st.markdown(f"**ప్రశ్న {idx}:** {row['question']}")
-            ans_key = f"ans_{i}_lvl_{level}_at_{attempt}"
-            sub_key = f"sub_{i}_lvl_{level}_at_{attempt}"
             
-            if sub_key not in st.session_state: st.session_state[sub_key] = False
-            
-            opts = [str(row['option_a']), str(row['option_b']), str(row['option_c']), str(row['option_d'])]
-            correct_val = str(row['correct_answer']).strip()
-            
-            # Selection Widget
-            current_choice = st.radio(f"Opt_{i}", opts, key=f"radio_{i}", 
-                                      index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), 
-                                      disabled=st.session_state[sub_key] or st.session_state.final_submitted, 
-                                      label_visibility="collapsed")
-            
-            # Individual Question Submit/Edit
-            if not st.session_state.final_submitted:
-                c1, c2 = st.columns([1, 2])
-                with c1:
-                    if not st.session_state[sub_key]:
-                        if st.button(f"Submit {idx} ✅", key=f"s_{i}"):
-                            if current_choice:
-                                st.session_state[ans_key] = current_choice
-                                st.session_state[sub_key] = True
-                                st.rerun()
-                    else:
-                        if st.button(f"Edit {idx} ✏️", key=f"e_{i}"):
-                            st.session_state[sub_key] = False
-                            st.rerun()
-            
-            # RESULT VISIBILITY AFTER FINAL SUBMIT
-            if st.session_state[sub_key]:
-                answered_count += 1
-                if st.session_state.final_submitted:
-                    user_ans = st.session_state.get(ans_key)
-                    if user_ans == correct_val:
-                        st.success(f"మీ సమాధానం: {user_ans} ✅ (Correct!)")
-                        score += 1
-                    else:
-                        st.error(f"మీ సమాధానం: {user_ans} ❌")
-                        st.info(f"సరైన సమాధానం: {correct_val}")
-            
-            st.divider()
-
-        # Final Submit Button
-        if answered_count == 10 and not st.session_state.final_submitted:
-            if st.button("🏁 Final Submit Task", type="primary", use_container_width=True):
-                st.session_state.final_submitted = True
-                st.rerun()
-
-        # Result Summary
-        if st.session_state.final_submitted:
-            st.subheader(f"📊 Score: {score}/10")
-            if score == 10:
-                st.balloons(); st.success("అద్భుతం! లెవెల్ పూర్తి చేసారు. 🎉")
-                if level == st.session_state.unlocked_level: st.session_state.unlocked_level += 1
-            else: 
-                st.error("తదుపరి లెవెల్ అన్లాక్ అవ్వాలంటే 10/10 రావాలి.")
-            st.button("మ్యాప్ కి వెళ్ళు 🗺️", on_click=reset_to_map)
-
-except Exception as e:
-    st.error(f"Error: {e}")
+            st.markdown(f"""
+                <div style="background
