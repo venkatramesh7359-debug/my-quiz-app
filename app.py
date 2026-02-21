@@ -47,49 +47,8 @@ def reset_to_map():
 def load_data(url):
     try:
         data = pd.read_csv(url)
-        data.columns = [str(c).strip() for c in data.columns]
-        if 'Subject' in data.columns:
-            data['Subject'] = data['Subject'].astype(str).str.strip().str.title()
-        return data
-    except Exception as e:
-        st.error(f"Error: {e}"); return None
-
-df = load_data(SHEET_URL)
-
-if df is not None:
-    # --- 1. LOGIN ---
-    if st.session_state.user_name == "":
-        st.title("🎮 Venkat's Quiz Quest")
-        name = st.text_input("మీ పేరు రాయండి:")
-        if st.button("Start Game 🚀"):
-            if name.strip() == "admin7997": st.session_state.user_name, st.session_state.is_admin = "Venkat", True
-            elif name.strip(): st.session_state.user_name = name
-            st.rerun()
-
-    # --- 2. SUBJECT SELECTION ---
-    elif st.session_state.selected_subject is None:
-        st.title("📚 Select Subject")
-        subjects = sorted(df['Subject'].unique())
-        for sub in subjects:
-            if st.button(f"📖 {sub}"):
-                st.session_state.selected_subject = sub
-                st.rerun()
-        if st.button("Logout 🚪"): st.session_state.user_name = ""; st.rerun()
-
-    # --- 3. MAP SECTION ---
-    elif st.session_state.current_playing_level is None:
-        sub = st.session_state.selected_subject
-        st.title(f"🗺️ {sub} Map")
-        if st.button("⬅️ Back to Subjects"): st.session_state.selected_subject = None; st.rerun()
-
-        sub_df = df[df['Subject'] == sub]
-        lessons = sorted(sub_df['lesson_name'].unique())
-        global_task_counter = 1 
-
-        for lesson in lessons:
-            st.markdown(f"### 📘 {lesson}")
-            l_df = sub_df[sub_df['lesson_name'] == lesson]
-            num_tasks = (len(l_df) // 10) + (1 if len(l_df) % 10 > 0 else 0)
-            cols = st.columns(5)
-            for t in range(1, num_tasks + 1):
-                unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked
+        # --- కాలమ్ పేర్లని శుభ్రం చేసే లాజిక్ ---
+        # అన్ని కాలమ్ పేర్ల చివర స్పేస్ లు తీసేసి, కేవలం మొదటి అక్షరం Capital చేస్తుంది
+        data.columns = [str(c).strip().capitalize() for c in data.columns]
+        
+        # 'Lesson_name' ని మనం చిన్న అక్షరాల్లో వాడుతున్న
