@@ -28,6 +28,7 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32n
 
 # 4. Session State initialization
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
+if 'selected_subject' not in st.session_state: st.session_state.selected_subject = None
 if 'unlocked_level' not in st.session_state: st.session_state.unlocked_level = 1
 if 'current_playing_level' not in st.session_state: st.session_state.current_playing_level = None
 if 'is_admin' not in st.session_state: st.session_state.is_admin = False
@@ -44,20 +45,10 @@ def reset_to_map():
     st.session_state.final_submitted = False
     st.rerun()
 
-def restart_level(level_id):
-    st.session_state.retry_count[level_id] = st.session_state.retry_count.get(level_id, 0) + 1
-    st.session_state.game_mode = None
-    st.session_state.start_time = None
-    st.session_state.final_submitted = False
-    keys_to_del = [k for k in st.session_state.keys() if f"_lvl_{level_id}" in k]
-    for k in keys_to_del: del st.session_state[k]
-    st.rerun()
-
 @st.cache_data(show_spinner=False)
 def load_data(url):
     try:
         data = pd.read_csv(url)
-        # Headers క్లీన్ చేయడం (ముఖ్యంగా పాత Headers)
         data.columns = [c.strip() for c in data.columns]
         return data
     except Exception as e:
@@ -67,7 +58,7 @@ def load_data(url):
 df = load_data(SHEET_URL)
 
 if df is not None:
-    # --- LOGIN SECTION ---
+    # --- 1. LOGIN SECTION ---
     if st.session_state.user_name == "":
         st.title("🎮 Venkat's Learning Quest")
         name = st.text_input("మీ పేరు రాయండి:") 
@@ -79,45 +70,62 @@ if df is not None:
                 st.session_state.user_name = name
             st.rerun()
 
-    # --- MAP SECTION ---
-    elif st.session_state.current_playing_level is None:
-        st.title("🗺️ Quiz Map")
-        st.subheader(f"Player: {st.session_state.user_name}")
+    # --- 2. SUBJECT SELECTION SECTION ---
+    elif st.session_state.selected_subject is None:
+        st.title("📚 సబ్జెక్టును ఎంచుకోండి")
+        st.subheader(f"హలో {st.session_state.user_name}, ఈరోజు ఏం నేర్చుకుందాం?")
         
-        # 'Subject' మరియు 'lesson_name' అనే పాత హెడర్స్ ని వాడుతున్నాం
         subjects = df['Subject'].unique()
+        
+        # సబ్జెక్టులను బటన్ల రూపంలో చూపిస్తున్నాం
+        for sub in subjects:
+            if st.button(f"📖 {sub}", use_container_width=True):
+                st.session_state.selected_subject = sub
+                st.rerun()
+        
+        if st.button("Logout 🚪", type="secondary"):
+            st.session_state.user_name = ""
+            st.rerun()
+
+    # --- 3. MAP SECTION (Selected Subject Only) ---
+    elif st.session_state.current_playing_level is None:
+        sub = st.session_state.selected_subject
+        st.title(f"🗺️ {sub} Map")
+        
+        # Sidebar to Change Subject
+        if st.sidebar.button("🔄 Change Subject"):
+            st.session_state.selected_subject = None
+            st.rerun()
+
+        sub_df = df[df['Subject'] == sub]
+        lessons = sub_df['lesson_name'].unique()
         global_task_counter = 1 
 
-        for sub in subjects:
-            st.markdown(f"## 📚 Subject: {sub}")
-            sub_df = df[df['Subject'] == sub]
-            lessons = sub_df['lesson_name'].unique()
+        for lesson in lessons:
+            st.markdown(f"### 📘 {lesson}")
+            lesson_df = sub_df[sub_df['lesson_name'] == lesson]
+            num_tasks = (len(lesson_df) // 10) + (1 if len(lesson_df) % 10 > 0 else 0)
             
-            for lesson in lessons:
-                st.markdown(f"### 📘 {lesson}")
-                lesson_df = sub_df[sub_df['lesson_name'] == lesson]
-                num_tasks = (len(lesson_df) // 10) + (1 if len(lesson_df) % 10 > 0 else 0)
+            cols = st.columns(5)
+            for t in range(1, num_tasks + 1):
+                is_unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked_level
                 
-                cols = st.columns(5)
-                for t in range(1, num_tasks + 1):
-                    is_unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked_level
-                    
-                    with cols[(t-1)%5]:
-                        if is_unlocked:
-                            if st.button(f"Task {t}\n⭐", key=f"btn_{sub}_{lesson}_{t}"):
-                                st.session_state.current_playing_level = f"{sub}_{lesson}_T{t}"
-                                st.session_state.current_sub = sub
-                                st.session_state.current_lesson = lesson
-                                st.session_state.current_task_num = t
-                                st.session_state.global_id = global_task_counter
-                                st.rerun()
-                        else:
-                            st.button(f"Task {t}\n🔒", key=f"btn_{sub}_{lesson}_{t}", disabled=True)
-                    
-                    global_task_counter += 1
-                st.divider()
+                with cols[(t-1)%5]:
+                    if is_unlocked:
+                        if st.button(f"Task {t}\n⭐", key=f"btn_{sub}_{lesson}_{t}"):
+                            st.session_state.current_playing_level = f"{sub}_{lesson}_T{t}"
+                            st.session_state.current_sub = sub
+                            st.session_state.current_lesson = lesson
+                            st.session_state.current_task_num = t
+                            st.session_state.global_id = global_task_counter
+                            st.rerun()
+                    else:
+                        st.button(f"Task {t}\n🔒", key=f"btn_{sub}_{lesson}_{t}", disabled=True)
+                
+                global_task_counter += 1
+            st.divider()
 
-    # --- QUIZ SECTION ---
+    # --- 4. QUIZ SECTION ---
     else:
         sub = st.session_state.current_sub
         lesson = st.session_state.current_lesson
@@ -126,7 +134,7 @@ if df is not None:
         attempt = st.session_state.retry_count.get(level_id, 0)
         
         if st.session_state.game_mode is None:
-            st.header(f"Task {task_num}: Mode Select")
+            st.header(f"{sub}: {lesson} - Task {task_num}")
             c1, c2 = st.columns(2)
             with c1:
                 if st.button("Normal Mode 🧘"): st.session_state.game_mode = "normal"; st.rerun()
@@ -135,11 +143,52 @@ if df is not None:
                     st.session_state.game_mode = "timer"
                     st.session_state.start_time = time.time()
                     st.rerun()
-            if st.button("⬅️ Back"): reset_to_map()
+            if st.button("⬅️ Back to Map"): reset_to_map()
             st.stop()
 
-        # Filtering logic for Task
+        # Filtering logic
         full_df = df[(df['Subject'] == sub) & (df['lesson_name'] == lesson)]
         level_df = full_df.iloc[(task_num-1)*10 : task_num*10]
         
         score = 0
+        answered_count = 0
+
+        for idx, (i, row) in enumerate(level_df.iterrows(), 1):
+            st.write(f"**Q{idx}:** {row['Question']}")
+            ans_key = f"a_{i}_{attempt}"
+            sub_key = f"s_{i}_{attempt}"
+            
+            opts = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
+            correct_val = str(row['Correct_Answer']).strip()
+            
+            if sub_key not in st.session_state: st.session_state[sub_key] = False
+            
+            choice = st.radio(f"R_{i}", opts, key=f"radio_{i}", 
+                              index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), 
+                              disabled=st.session_state[sub_key] or st.session_state.final_submitted,
+                              label_visibility="collapsed")
+            
+            if not st.session_state.final_submitted:
+                if not st.session_state[sub_key] and st.button(f"Submit {idx}", key=f"btn_s_{i}"):
+                    if choice: st.session_state[ans_key] = choice; st.session_state[sub_key] = True; st.rerun()
+            
+            if st.session_state[sub_key]:
+                answered_count += 1
+                if st.session_state.final_submitted:
+                    if st.session_state.get(ans_key) == correct_val:
+                        st.success("Correct! ✅"); score += 1
+                    else:
+                        st.error(f"Wrong! ❌ Correct: {correct_val}")
+            st.divider()
+
+        if answered_count == len(level_df) and not st.session_state.final_submitted:
+            if st.button("🏁 Final Submit", type="primary", use_container_width=True): 
+                st.session_state.final_submitted = True; st.rerun()
+
+        if st.session_state.final_submitted:
+            st.subheader(f"📊 Score: {score}/{len(level_df)}")
+            if score == len(level_df):
+                st.balloons()
+                if st.session_state.global_id == st.session_state.unlocked_level:
+                    st.session_state.unlocked_level += 1
+            st.button("Map 🗺️", on_click=reset_to_map)
