@@ -7,10 +7,10 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
-# 2. Advanced CSS for Sticky Timer and Mobile UI
+# 2. Advanced CSS: Sticky Timer & Mobile Buttons
 st.markdown("""
     <style>
-    /* Sticky Timer Styling */
+    /* టైమర్ పైన ఫిక్స్ అయి ఉండటానికి */
     .sticky-timer {
         position: fixed;
         top: 0;
@@ -19,22 +19,29 @@ st.markdown("""
         background-color: #ff4b4b;
         color: white;
         text-align: center;
-        padding: 10px;
+        padding: 12px;
         z-index: 9999;
+        font-size: 20px;
         font-weight: bold;
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
+        box-shadow: 0px 2px 10px rgba(0,0,0,0.3);
     }
-    /* Subject Button Styling for Mobile */
+    /* మొబైల్ బటన్ల సైజు పెంచడానికి */
     .stButton > button {
         width: 100%;
-        border-radius: 10px;
-        height: 60px;
+        border-radius: 12px;
+        height: 55px;
         font-size: 18px !important;
+        margin-bottom: 10px;
+    }
+    /* క్విజ్ బాక్స్ ల మధ్య గ్యాప్ కోసం */
+    .stRadio > label {
+        font-size: 18px !important;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. JavaScript to hide Header
+# 3. Header ని దాచిపెట్టడానికి JavaScript
 components.html(
     """
     <script>
@@ -53,15 +60,14 @@ components.html(
 # 4. Sheet URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
 
-if 'user_name' not in st.session_state: st.session_state.user_name = ""
-if 'selected_subject' not in st.session_state: st.session_state.selected_subject = None
-if 'unlocked_level' not in st.session_state: st.session_state.unlocked_level = 1
-if 'current_playing_level' not in st.session_state: st.session_state.current_playing_level = None
-if 'is_admin' not in st.session_state: st.session_state.is_admin = False
-if 'retry_count' not in st.session_state: st.session_state.retry_count = {}
-if 'game_mode' not in st.session_state: st.session_state.game_mode = None
-if 'start_time' not in st.session_state: st.session_state.start_time = None
-if 'final_submitted' not in st.session_state: st.session_state.final_submitted = False
+# 5. Session State Initialization
+state_keys = {
+    'user_name': "", 'selected_subject': None, 'unlocked_level': 1,
+    'current_playing_level': None, 'is_admin': False, 'retry_count': {},
+    'game_mode': None, 'start_time': None, 'final_submitted': False
+}
+for key, val in state_keys.items():
+    if key not in st.session_state: st.session_state[key] = val
 
 def reset_to_map():
     st.session_state.current_playing_level = None
@@ -83,9 +89,9 @@ def load_data(url):
 df = load_data(SHEET_URL)
 
 if df is not None:
-    # --- LOGIN ---
+    # --- 1. LOGIN SECTION ---
     if st.session_state.user_name == "":
-        st.title("🎮 Venkat's Quiz Quest")
+        st.title("🎮 Venkat's Learning Quest")
         name = st.text_input("మీ పేరు రాయండి:") 
         if st.button("Start Game 🚀"):
             if name.strip() == "admin7997": 
@@ -94,9 +100,10 @@ if df is not None:
                 st.session_state.user_name = name
             st.rerun()
 
-    # --- SUBJECT SELECTION ---
+    # --- 2. SUBJECT SELECTION SECTION ---
     elif st.session_state.selected_subject is None:
         st.title("📚 Select Subject")
+        # సబ్జెక్ట్ పేర్లలో తేడాలు ఉంటే సరిచేయడానికి (Grouping fix)
         subjects = sorted(df['Subject'].unique())
         for sub in subjects:
             if st.button(f"📖 {sub}"):
@@ -105,7 +112,7 @@ if df is not None:
         if st.button("Logout 🚪"):
             st.session_state.user_name = ""; st.rerun()
 
-    # --- MAP SECTION ---
+    # --- 3. MAP SECTION ---
     elif st.session_state.current_playing_level is None:
         sub = st.session_state.selected_subject
         st.title(f"🗺️ {sub}")
@@ -136,8 +143,13 @@ if df is not None:
                 global_task_counter += 1
             st.divider()
 
-    # --- QUIZ SECTION ---
+    # --- 4. QUIZ SECTION ---
     else:
+        # Session State Safety Check (Error Fix)
+        if 'cur_sub' not in st.session_state:
+            reset_to_map()
+            st.stop()
+
         sub, lesson, t_num = st.session_state.cur_sub, st.session_state.cur_lesson, st.session_state.cur_t_num
         level_id, attempt = st.session_state.current_playing_level, st.session_state.retry_count.get(st.session_state.current_playing_level, 0)
         
@@ -149,11 +161,11 @@ if df is not None:
             if st.button("⬅️ Back"): reset_to_map()
             st.stop()
 
-        # STICKY TIMER DISPLAY
+        # Sticky Timer Logic
         if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
-            st_autorefresh(interval=1000, key="tr")
+            st_autorefresh(interval=1000, key="timer_refresh")
             rem = max(0, 300 - int(time.time() - st.session_state.start_time))
-            st.markdown(f'<div class="sticky-timer">⏳ Time Left: {rem//60:02d}:{rem%60:02d}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="sticky-timer">⏳ Time: {rem//60:02d}:{rem%60:02d}</div>', unsafe_allow_html=True)
             if rem <= 0:
                 st.error("⏰ Time Up!"); st.button("Retry", on_click=reset_to_map); st.stop()
 
@@ -161,16 +173,19 @@ if df is not None:
         l_df = f_df.iloc[(t_num-1)*10 : t_num*10]
         score, answered = 0, 0
 
+        # ఆప్షన్స్ లో అదనపు స్పేస్ లు రాకుండా టైమర్ కింద గ్యాప్ ఇస్తున్నాం
+        st.write("<br><br>", unsafe_allow_html=True)
+
         for idx, (i, row) in enumerate(l_df.iterrows(), 1):
-            st.write(f"**Q{idx}:** {row['Question']}")
+            st.write(f"**ప్రశ్న {idx}:** {row['Question']}")
             ans_key, sub_key = f"a_{i}_{attempt}", f"s_{i}_{attempt}"
             opts = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
             
             if sub_key not in st.session_state: st.session_state[sub_key] = False
-            choice = st.radio(f"R_{i}", opts, key=f"r_{i}", index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), disabled=st.session_state[sub_key] or st.session_state.final_submitted, label_visibility="collapsed")
+            choice = st.radio(f"Q_{i}", opts, key=f"r_{i}", index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), disabled=st.session_state[sub_key] or st.session_state.final_submitted, label_visibility="collapsed")
             
             if not st.session_state.final_submitted:
-                if not st.session_state[sub_key] and st.button(f"Submit {idx}", key=f"btn_s_{i}"):
+                if not st.session_state[sub_key] and st.button(f"Submit {idx} ✅", key=f"btn_s_{i}"):
                     if choice: st.session_state[ans_key] = choice; st.session_state[sub_key] = True; st.rerun()
             
             if st.session_state[sub_key]:
@@ -183,10 +198,11 @@ if df is not None:
             st.divider()
 
         if answered == len(l_df) and not st.session_state.final_submitted:
-            if st.button("🏁 Final Submit", type="primary"): st.session_state.final_submitted = True; st.rerun()
+            if st.button("🏁 Final Submit", type="primary"): 
+                st.session_state.final_submitted = True; st.rerun()
 
         if st.session_state.final_submitted:
-            st.subheader(f"Score: {score}/{len(l_df)}")
+            st.subheader(f"📊 Score: {score}/{len(l_df)}")
             if score == len(l_df): st.balloons()
             if score >= 8 and st.session_state.g_id == st.session_state.unlocked_level:
                 st.session_state.unlocked_level += 1
