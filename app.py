@@ -11,26 +11,11 @@ st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="c
 st.markdown("""
     <style>
     .sticky-timer {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        background-color: #ff4b4b;
-        color: white;
-        text-align: center;
-        padding: 12px;
-        z-index: 9999;
-        font-size: 20px;
-        font-weight: bold;
-        box-shadow: 0px 2px 10px rgba(0,0,0,0.3);
+        position: fixed; top: 0; left: 0; width: 100%;
+        background-color: #ff4b4b; color: white; text-align: center;
+        padding: 12px; z-index: 9999; font-size: 20px; font-weight: bold;
     }
-    .stButton > button {
-        width: 100%;
-        border-radius: 12px;
-        height: 55px;
-        font-size: 18px !important;
-        margin-bottom: 10px;
-    }
+    .stButton > button { width: 100%; border-radius: 12px; height: 55px; font-size: 18px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -54,8 +39,18 @@ def reset_to_map():
 def load_data(url):
     try:
         data = pd.read_csv(url)
-        # కాలమ్ పేర్లలో స్పేస్‌లు ఉంటే తీసేస్తుంది
-        data.columns = [c.strip() for c in data.columns]
+        # --- HEADER FIX LOGIC ---
+        # కాలమ్ పేర్లు అన్నీ కలిసిపోయి ఉంటే వాటిని విడగొట్టడానికి ఈ ప్రయత్నం
+        old_cols = "".join(data.columns).lower()
+        if 'subject' in old_cols and 'lesson_name' in old_cols:
+            # మనం వాడాల్సిన స్టాండర్డ్ పేర్లు
+            new_cols = ['class', 'Subject', 'lesson_name', 'Task_ID', 'Question', 'Option_A', 'Option_B', 'Option_C', 'Option_D', 'Correct_Answer']
+            # ఒకవేళ షీట్ లో కాలమ్స్ సంఖ్య సరిపోతేనే రీనేమ్ చేస్తుంది
+            if len(data.columns) == len(new_cols):
+                data.columns = new_cols
+            else:
+                # లేదంటే ఉన్న వాటిని క్లీన్ చేస్తుంది
+                data.columns = [c.strip() for c in data.columns]
         return data
     except Exception as e:
         st.error(f"Error: {e}"); return None
@@ -75,16 +70,17 @@ if df is not None:
     # --- 2. SUBJECT SELECTION ---
     elif st.session_state.selected_subject is None:
         st.title("📚 Select Subject")
+        # 'Subject' కాలమ్ కోసం వెతుకుతోంది
+        col_name = 'Subject' if 'Subject' in df.columns else (df.columns[1] if len(df.columns) > 1 else None)
         
-        # ఇక్కడ 'Subject' (చిన్న 's' లేదు) అని మార్చాను
-        if 'Subject' in df.columns:
-            sub_list = sorted(df['Subject'].unique())
+        if col_name and col_name in df.columns:
+            sub_list = sorted(df[col_name].dropna().unique())
             for sub in sub_list:
                 if st.button(f"📖 {sub}"):
                     st.session_state.selected_subject = sub
                     st.rerun()
         else:
-            st.error(f"Sheet లో 'Subject' కాలమ్ దొరకలేదు! ఉన్న కాలమ్స్: {list(df.columns)}")
+            st.error(f"కాలమ్స్ సరిగ్గా లేవు. ఉన్న హెడర్స్: {list(df.columns)}")
         
         if st.button("Logout 🚪"): st.session_state.user_name = ""; st.rerun()
 
