@@ -48,9 +48,6 @@ def load_data(url):
     try:
         data = pd.read_csv(url)
         data.columns = [str(c).strip() for c in data.columns]
-        if 'Subject' not in data.columns:
-            mapping = {c.lower(): c for c in data.columns}
-            if 'subject' in mapping: data.rename(columns={mapping['subject']: 'Subject'}, inplace=True)
         if 'Subject' in data.columns:
             data['Subject'] = data['Subject'].astype(str).str.strip().str.title()
         return data
@@ -63,7 +60,7 @@ if df is not None:
     # --- 1. LOGIN ---
     if st.session_state.user_name == "":
         st.title("🎮 Venkat's Quiz Quest")
-        name = st.text_input("Meeru Peru Rayandi:")
+        name = st.text_input("మీ పేరు రాయండి:")
         if st.button("Start Game 🚀"):
             if name.strip() == "admin7997": st.session_state.user_name, st.session_state.is_admin = "Venkat", True
             elif name.strip(): st.session_state.user_name = name
@@ -95,23 +92,4 @@ if df is not None:
             num_tasks = (len(l_df) // 10) + (1 if len(l_df) % 10 > 0 else 0)
             cols = st.columns(5)
             for t in range(1, num_tasks + 1):
-                unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked_level
-                with cols[(t-1)%5]:
-                    if unlocked:
-                        if st.button(f"T{t}\n⭐", key=f"b_{sub}_{lesson}_{t}"):
-                            st.session_state.current_playing_level = f"{sub}_{lesson}_T{t}"
-                            st.session_state.cur_sub, st.session_state.cur_lesson, st.session_state.cur_t_num, st.session_state.g_id = sub, lesson, t, global_task_counter
-                            st.rerun()
-                    else: st.button(f"T{t}\n🔒", key=f"b_{sub}_{lesson}_{t}", disabled=True)
-                global_task_counter += 1
-            st.divider()
-
-    # --- 4. QUIZ SECTION ---
-    else:
-        sub, lesson, t_num = st.session_state.cur_sub, st.session_state.cur_lesson, st.session_state.cur_t_num
-        
-        if st.session_state.game_mode is None:
-            st.header(f"Task {t_num}")
-            if st.button("Normal Mode 🧘"): st.session_state.game_mode = "normal"; st.rerun()
-            if st.button("Speed Run ⏱️"): 
-                st.session_state.game_mode = "timer
+                unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked
