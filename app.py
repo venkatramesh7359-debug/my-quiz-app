@@ -7,25 +7,26 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
-# 2. UI Styling
+# 2. UI Styling: Sticky Timer & Buttons
 st.markdown("""
     <style>
     .sticky-timer {
         position: fixed; top: 0; left: 0; width: 100%;
         background-color: #ff4b4b; color: white; text-align: center;
         padding: 12px; z-index: 9999; font-size: 20px; font-weight: bold;
+        box-shadow: 0px 2px 10px rgba(0,0,0,0.3);
     }
     .stButton > button { width: 100%; border-radius: 12px; height: 50px; font-size: 16px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Hide Streamlit Header
+# 3. Hide Streamlit Header & Footer
 components.html("<script>const removeElements = () => { const selectors = ['header', '.stAppDeployButton']; selectors.forEach(s => { const els = window.parent.document.querySelectorAll(s); els.forEach(el => el.style.display = 'none'); }); }; setInterval(removeElements, 500);</script>", height=0)
 
 # 4. Sheet URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/17ErdXLapXbTPCFpitqZErZIV32nE0vcYTqcFO7Ip-Lg/export?format=csv"
 
-# 5. State Init
+# 5. Session State Init
 state_defaults = {
     'user_name': "", 'selected_subject': None, 'unlocked_level': 1,
     'current_playing_level': None, 'is_admin': False, 'retry_trigger': 0,
@@ -35,7 +36,7 @@ for key, val in state_defaults.items():
     if key not in st.session_state: st.session_state[key] = val
 
 def reset_to_map():
-    st.session_state.retry_trigger += 1 # Resetting options
+    st.session_state.retry_trigger += 1 
     st.session_state.current_playing_level = None
     st.session_state.game_mode = None
     st.session_state.final_submitted = False
@@ -81,7 +82,7 @@ if df is not None:
         if st.button("⬅️ Back to Subjects"): st.session_state.selected_subject = None; st.rerun()
 
         sub_df = df[df['Subject'] == sub]
-        # Lessons Order Fix
+        # Lessons Order
         lessons = sorted(sub_df['lesson_name'].unique())
         global_task_counter = 1 
 
@@ -90,7 +91,7 @@ if df is not None:
             l_df = sub_df[sub_df['lesson_name'] == lesson]
             num_tasks = (len(l_df) // 10) + (1 if len(l_df) % 10 > 0 else 0)
             
-            # Tasks Order Fix (1, 2, 3...)
+            # Tasks order fix (1, 2, 3...)
             cols = st.columns(5)
             for t in range(1, num_tasks + 1):
                 unlocked = st.session_state.is_admin or global_task_counter <= st.session_state.unlocked_level
@@ -125,4 +126,55 @@ if df is not None:
         f_df = df[(df['Subject'] == sub) & (df['lesson_name'] == lesson)]
         l_df = f_df.iloc[(t_num-1)*10 : t_num*10]
         score, answered = 0, 0
-        st.write("<br
+        
+        # FIXED: Line 128 Syntax Error Fixed here
+        st.write("<br><br>", unsafe_allow_html=True)
+
+        for idx, (i, row) in enumerate(l_df.iterrows(), 1):
+            st.write(f"**Q {idx}:** {row['Question']}")
+            
+            ans_key = f"ans_{i}_{st.session_state.retry_trigger}"
+            sub_key = f"sub_{i}_{st.session_state.retry_trigger}"
+            opts = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
+            
+            if sub_key not in st.session_state: st.session_state[sub_key] = False
+            
+            # User can change selection anytime before Final Submit
+            choice = st.radio(f"Q_{i}", opts, key=f"r_{i}_{st.session_state.retry_trigger}", 
+                              index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), 
+                              disabled=st.session_state.final_submitted,
+                              label_visibility="collapsed")
+            
+            if not st.session_state.final_submitted:
+                if st.button(f"Save Answer {idx} ✅", key=f"btn_{i}_{st.session_state.retry_trigger}"):
+                    if choice: 
+                        st.session_state[ans_key] = choice
+                        st.session_state[sub_key] = True
+                        st.toast(f"Question {idx} saved!")
+            
+            if st.session_state.get(sub_key):
+                answered += 1
+                if st.session_state.final_submitted:
+                    if st.session_state.get(ans_key) == str(row['Correct_Answer']).strip(): 
+                        st.success("Correct! ✅"); score += 1
+                    else: 
+                        st.error(f"Wrong! ❌ Correct: {row['Correct_Answer']}")
+            st.divider()
+
+        if answered == len(l_df) and not st.session_state.final_submitted:
+            if st.button("🏁 Final Submit", type="primary"): 
+                st.session_state.final_submitted = True; st.rerun()
+
+        if st.session_state.final_submitted:
+            st.subheader(f"📊 Score: {score}/{len(l_df)}")
+            if score == 10:
+                st.balloons()
+                st.success("🎉 అద్భుతం! నెక్స్ట్ టాస్క్ అన్‌లాక్ అయ్యింది!")
+                if st.session_state.g_id == st.session_state.unlocked_level:
+                    st.session_state.unlocked_level += 1
+                st.button("Next Level ➡️", on_click=reset_to_map)
+            else:
+                st.warning("⚠️ 10/10 వస్తేనే నెక్స్ట్ లెవెల్ ఓపెన్ అవుతుంది. మళ్ళీ ప్రయత్నించండి!")
+                st.button("Retry Task 🔄", on_click=reset_to_map)
+            
+            if st.button("Map 🗺️", key="map_btn", on_click=reset_to_map): pass
