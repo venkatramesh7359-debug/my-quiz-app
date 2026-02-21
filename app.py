@@ -7,7 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 # 1. Page Config
 st.set_page_config(page_title="Venkat's Quiz Quest", page_icon="🎮", layout="centered")
 
-# 2. CSS for Sticky Timer & Mobile UI
+# 2. CSS for Sticky Timer & UI
 st.markdown("""
     <style>
     .sticky-timer {
@@ -48,17 +48,16 @@ def reset_to_map():
 def load_data(url):
     try:
         data = pd.read_csv(url)
-        # Fix: Headers kalisipoyi unna sare vidigotte logic
         data.columns = [str(c).strip() for c in data.columns]
         
-        # Case insensitive mapping for 'subject' and 'lesson_name'
+        # Mapping to handle lower/upper case
         mapping = {c.lower(): c for c in data.columns}
         if 'subject' in mapping:
             data.rename(columns={mapping['subject']: 'Subject'}, inplace=True)
         if 'lesson_name' in mapping:
             data.rename(columns={mapping['lesson_name']: 'lesson_name'}, inplace=True)
         
-        # Subject Grouping Fix: Deeni valla 'social', 'Social' anni okate folder lo padatayi
+        # Grouping Fix: Social lessons anni okate folder lo padatayi
         if 'Subject' in data.columns:
             data['Subject'] = data['Subject'].astype(str).str.strip().str.title()
             
@@ -90,16 +89,16 @@ if df is not None:
                     st.session_state.selected_subject = sub
                     st.rerun()
         else:
-            st.error(f"Sheet lo 'Subject' column dorakaledu! Columns: {list(df.columns)}")
+            st.error(f"Sheet lo 'Subject' column dorakaledu!")
         
         if st.button("Logout 🚪"): st.session_state.user_name = ""; st.rerun()
 
-    # --- 3. MAP SECTION (Lessons Folder) ---
+    # --- 3. MAP SECTION ---
     elif st.session_state.current_playing_level is None:
         sub = st.session_state.selected_subject
         st.title(f"🗺️ {sub} Map")
         
-        # BACK OPTION
+        # BACK BUTTON
         if st.button("⬅️ Back to Subjects"):
             st.session_state.selected_subject = None; st.rerun()
 
@@ -143,7 +142,7 @@ if df is not None:
         if st.session_state.game_mode == "timer" and not st.session_state.final_submitted:
             st_autorefresh(interval=1000, key="timer_refresh")
             rem = max(0, 300 - int(time.time() - st.session_state.start_time))
-            st.markdown(f'<div class="sticky-timer">⏳ Time Left: {rem//60:02d}:{rem%60:02d}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="sticky-timer">⏳ Time: {rem//60:02d}:{rem%60:02d}</div>', unsafe_allow_html=True)
             if rem <= 0: st.error("⏰ Time Up!"); st.button("Retry", on_click=reset_to_map); st.stop()
 
         f_df = df[(df['Subject'] == sub) & (df['lesson_name'] == lesson)]
@@ -152,8 +151,34 @@ if df is not None:
         st.write("<br><br>", unsafe_allow_html=True)
 
         for idx, (i, row) in enumerate(l_df.iterrows(), 1):
-            st.write(f"**Prasna {idx}:** {row['Question']}")
+            st.write(f"**Q {idx}:** {row['Question']}")
             ans_key, sub_key = f"a_{i}_{attempt}", f"s_{i}_{attempt}"
             opts = [str(row['Option_A']), str(row['Option_B']), str(row['Option_C']), str(row['Option_D'])]
             
-            if sub_key
+            if sub_key not in st.session_state: st.session_state[sub_key] = False
+            
+            choice = st.radio(f"Q_{i}", opts, key=f"r_{i}", 
+                              index=None if ans_key not in st.session_state else opts.index(st.session_state[ans_key]), 
+                              disabled=st.session_state[sub_key] or st.session_state.final_submitted, 
+                              label_visibility="collapsed")
+            
+            if not st.session_state.final_submitted:
+                if not st.session_state[sub_key] and st.button(f"Submit {idx} ✅", key=f"btn_s_{i}"):
+                    if choice: st.session_state[ans_key] = choice; st.session_state[sub_key] = True; st.rerun()
+            
+            if st.session_state[sub_key]:
+                answered += 1
+                if st.session_state.final_submitted:
+                    if st.session_state[ans_key] == str(row['Correct_Answer']).strip(): st.success("Correct! ✅"); score += 1
+                    else: st.error(f"Wrong! ❌ Correct: {row['Correct_Answer']}")
+            st.divider()
+
+        if answered == len(l_df) and not st.session_state.final_submitted:
+            if st.button("🏁 Final Submit", type="primary"): st.session_state.final_submitted = True; st.rerun()
+
+        if st.session_state.final_submitted:
+            st.subheader(f"📊 Score: {score}/{len(l_df)}")
+            if score == len(l_df): st.balloons()
+            if score >= 8 and st.session_state.g_id == st.session_state.unlocked_level: 
+                st.session_state.unlocked_level += 1
+            st.button("Map 🗺️", on_click=reset_to_map)
